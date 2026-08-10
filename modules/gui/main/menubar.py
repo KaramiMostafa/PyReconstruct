@@ -459,6 +459,15 @@ def return_plugin_menu(self):
                     ("configure_image_channels_act", "Image channel display...", "", self.configureImageChannels),
                     ("configure_roi_overlay_act", "ROI overlay display...", "", self.configureROIOverlay),
                 ]
+            },
+            {
+                "attr_name": "multiplexmappingpluginmenu",
+                "text": "Multiplex RNA mapping",
+                "opts": [
+                    ("import_multiplex_rois_act", "1. Import DAPI/RNA ROI folders...", "", self.importMultiplexROIFolders),
+                    ("run_multiplex_mapping_act", "2. Map RNA through DAPI tracks...", "", self.runMultiplexRNAMapping),
+                    ("review_multiplex_mapping_act", "3. Review mapped RNA...", "", self.reviewMultiplexMappings),
+                ]
             }
         ]
     }

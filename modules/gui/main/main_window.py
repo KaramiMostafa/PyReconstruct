@@ -3110,13 +3110,15 @@ class MainWindow(QMainWindow):
 
         structure = [
             ["From section", ("int", all_secs[0]), "to section", ("int", all_secs[-1]), " "],
+            ["Only source trace names beginning with (optional)", ("text", "")],
+            ["Only source object group (optional)", ("text", "")],
             ["Prefix", (True, "text", "cell_")],
         ]
         response, confirmed = QuickDialog.get(self, structure, "Hungarian Tracking", spacing=10)
         if not confirmed:
             return
 
-        start_sec, end_sec, prefix = response[0], response[1], response[2]
+        start_sec, end_sec, source_prefix, source_group, prefix = response
 
         try:
             from pyrecon_connector import run_hungarian_tracking_on_series
@@ -3125,7 +3127,10 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            n = run_hungarian_tracking_on_series(self.series, start_sec, end_sec, prefix=prefix)
+            n = run_hungarian_tracking_on_series(
+                self.series, start_sec, end_sec, prefix=prefix,
+                source_prefix=source_prefix, source_group=source_group,
+            )
         except Exception as e:
             notify(f"Hungarian tracking failed:\n{e}")
             return
@@ -3149,6 +3154,8 @@ class MainWindow(QMainWindow):
 
         structure = [
             ["From section", ("int", all_secs[0]), "to section", ("int", all_secs[-1]), " "],
+            ["Only source trace names beginning with (optional)", ("text", "")],
+            ["Only source object group (optional)", ("text", "")],
             ["Prefix", (True, "text", "bt_cell_")],
             ["Model checkpoint", ("file", "", "PyTorch checkpoints (*.pt *.pth);;All files (*)")],
             ["Training epochs if no checkpoint", ("int", 20)],
@@ -3158,7 +3165,7 @@ class MainWindow(QMainWindow):
         if not confirmed:
             return
 
-        start_sec, end_sec, prefix, model_path, epochs, max_motion = response
+        start_sec, end_sec, source_prefix, source_group, prefix, model_path, epochs, max_motion = response
 
         try:
             from pyrecon_connector import run_bayesian_tracking_on_series
@@ -3175,6 +3182,8 @@ class MainWindow(QMainWindow):
                 model_path=model_path,
                 train_epochs=epochs,
                 motion_threshold=max_motion,
+                source_prefix=source_prefix,
+                source_group=source_group,
             )
         except Exception as e:
             notify(f"Bayesian Transformer tracking failed:\n{e}")
@@ -3317,6 +3326,128 @@ class MainWindow(QMainWindow):
         self.field.table_manager.recreateTables()
         self.seriesModified(True)
         notify(f"Cellpose-SAM segmentation done. Created {n} ROI traces on section {self.series.current_section}.")
+
+    def importMultiplexROIFolders(self):
+        if self.series and self.series.isWelcomeSeries():
+            notify("Open a real series first.")
+            return
+        structure = [
+            ["Import ImageJ ROI files or ZIPs. Folder/file names must contain Section or Sec followed by the section number."],
+            ["DAPI ROI folder (optional)", ("dir", "")],
+            ["RNA ROI folder (optional)", ("dir", "")],
+            ["DAPI trace prefix", (True, "text", "dapi_")],
+            ["RNA trace prefix", (True, "text", "rna_")],
+            ["DAPI object group", (True, "text", "multiplex_dapi")],
+            ["RNA object group", (True, "text", "multiplex_rna_anchor")],
+        ]
+        response, confirmed = QuickDialog.get(self, structure, "Import Multiplex ROI Folders", spacing=10)
+        if not confirmed:
+            return
+        dapi_folder, rna_folder, dapi_prefix, rna_prefix, dapi_group, rna_group = response
+        if not dapi_folder and not rna_folder:
+            notify("Choose at least one ROI folder.")
+            return
+        self.saveAllData()
+        try:
+            from pyrecon_connector import import_multiplex_roi_folders
+            result = import_multiplex_roi_folders(
+                self.series,
+                dapi_folder=dapi_folder,
+                rna_folder=rna_folder,
+                dapi_prefix=dapi_prefix,
+                rna_prefix=rna_prefix,
+                dapi_group=dapi_group,
+                rna_group=rna_group,
+            )
+        except Exception as e:
+            notify(f"Multiplex ROI import failed:\n{e}")
+            return
+        self.field.reload()
+        self.field.table_manager.recreateTables()
+        self.seriesModified(True)
+        notify(
+            f"Multiplex ROI import done. DAPI: {result['dapi']}; "
+            f"RNA: {result['rna']}; skipped: {result['skipped']}."
+        )
+
+    def runMultiplexRNAMapping(self):
+        if self.series and self.series.isWelcomeSeries():
+            notify("Open a real series first.")
+            return
+        structure = [
+            ["Map anchor RNA traces through tracked DAPI identities and a local DAPI deformation field."],
+            ["Mapping windows (anchor:targets)", (True, "text", "1:2-5;6:7-18;19:20-29;40:30-39")],
+            ["Tracked DAPI name prefix (optional)", ("text", "cell_")],
+            ["Tracked DAPI object group (optional)", ("text", "")],
+            ["RNA name prefix (optional)", ("text", "rna_")],
+            ["RNA object group (optional)", ("text", "")],
+            ["Mapped RNA name prefix", (True, "text", "mapped_rna_")],
+            ["Maximum RNA-to-DAPI association distance", ("float", 15.0)],
+            ["Local neighbor tracks", ("int", 7)],
+            ["High-confidence threshold", ("float", 0.70, (0.0, 1.0))],
+            ["Output folder for CSV and QC plots", (True, "dir", "")],
+            ["Existing mapped traces", ("check", ("Overwrite", False))],
+        ]
+        response, confirmed = QuickDialog.get(self, structure, "Multiplex RNA Mapping", spacing=10)
+        if not confirmed:
+            return
+        (
+            windows, dapi_prefix, dapi_group, rna_prefix, rna_group,
+            mapped_prefix, max_distance, neighbors, confidence_threshold,
+            output_dir, overwrite_choice,
+        ) = response
+        self.saveAllData()
+        try:
+            from pyrecon_connector import run_multiplex_rna_mapping
+            result = run_multiplex_rna_mapping(
+                self.series,
+                mapping_windows=windows,
+                dapi_prefix=dapi_prefix,
+                dapi_group=dapi_group,
+                rna_prefix=rna_prefix,
+                rna_group=rna_group,
+                mapped_prefix=mapped_prefix,
+                output_dir=output_dir,
+                association_max_distance=max_distance,
+                neighbor_count=neighbors,
+                high_confidence_threshold=confidence_threshold,
+                overwrite=bool(overwrite_choice[0][1]),
+            )
+        except Exception as e:
+            notify(f"Multiplex RNA mapping failed:\n{e}")
+            return
+        self.field.reload()
+        self.field.table_manager.recreateTables()
+        self.seriesModified(True)
+        notify(
+            f"RNA mapping done. Created {result['created']} traces: "
+            f"{result['high_confidence']} high confidence, {result['review']} need review.\n"
+            f"Skipped: {result['skipped_unassociated']} unassociated RNA and "
+            f"{result['skipped_missing_track']} missing target tracks.\n\n"
+            f"CSV: {result.get('csv', '')}\nQC plots: {result.get('qc_dir', '')}"
+        )
+
+    def reviewMultiplexMappings(self):
+        if self.series and self.series.isWelcomeSeries():
+            notify("Open a real series first.")
+            return
+        structure = [
+            ["Show", ("combo", ["mappings needing review", "high-confidence mappings", "all mapped RNA"], "mappings needing review")],
+        ]
+        response, confirmed = QuickDialog.get(self, structure, "Review Multiplex Mappings", spacing=10)
+        if not confirmed:
+            return
+        choice = response[0]
+        filters = {
+            "mappings needing review": "multiplex_mapping_review",
+            "high-confidence mappings": "multiplex_mapping_high_confidence",
+            "all mapped RNA": "multiplex_mapped_rna",
+        }
+        self.series.setOption("roi_overlay_mode", "only matching")
+        self.series.setOption("roi_overlay_filter", filters[choice])
+        self.field.generateView(generate_image=False)
+        self.seriesModified(True)
+        notify("ROI display filtered for mapping review. Select and edit traces normally in PyReconstruct.")
 
     def configureImageChannels(self):
         if self.series and self.series.isWelcomeSeries():
