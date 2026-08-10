@@ -3096,6 +3096,20 @@ class MainWindow(QMainWindow):
             self.viewer.close()
         event.accept()
 
+    def runHungarianTracking(self):
+    # Minimal proof that the menu works
+        if self.series and self.series.isWelcomeSeries():
+            notify("Open a real series first (not the welcome series).")
+            return
+        notify("Hungarian tracking clicked. (Next: call your connector/core here.)")
+
+    def runAdvancedTracking(self):
+        # Minimal proof that the menu works
+        if self.series and self.series.isWelcomeSeries():
+            notify("Open a real series first (not the welcome series).")
+            return
+        notify("Advanced tracking clicked. (Next: call your connector/core here.)")
+
 
 qdark_addon = """
 QPushButton {border: 1px solid transparent}

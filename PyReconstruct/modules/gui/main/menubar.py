@@ -431,6 +431,16 @@ def return_help_menu(self):
         ]
     }
 
+def return_tracking_menu(self):
+    """Return tracking menu."""
+    return {
+        "attr_name": "trackingmenu",
+        "text": "Tracking",
+        "opts": [
+            ("run_hungarian_tracking_act", "Run Hungarian tracking...", "", self.runHungarianTracking),
+            ("run_advanced_tracking_act", "Run Advanced tracking...", "", self.runAdvancedTracking),
+        ]
+    }
 
 def return_menubar(self):
     """Return the complete menubar."""
@@ -442,6 +452,7 @@ def return_menubar(self):
         return_section_menu(self),
         return_list_menu(self),
         return_alignments_menu(self),
+        return_tracking_menu(self),
         ##return_autoseg_menu(self),
         return_view_menu(self),
         return_help_menu(self)
