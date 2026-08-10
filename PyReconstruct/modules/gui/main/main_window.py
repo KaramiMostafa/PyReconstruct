@@ -3113,12 +3113,13 @@ class MainWindow(QMainWindow):
             ["Only source trace names beginning with (optional)", ("text", "")],
             ["Only source object group (optional)", ("text", "")],
             ["Prefix", (True, "text", "cell_")],
+            ["Expert constraints", ("check", ("Apply saved expert feedback", True))],
         ]
         response, confirmed = QuickDialog.get(self, structure, "Hungarian Tracking", spacing=10)
         if not confirmed:
             return
 
-        start_sec, end_sec, source_prefix, source_group, prefix = response
+        start_sec, end_sec, source_prefix, source_group, prefix, feedback_choice = response
 
         try:
             from pyrecon_connector import run_hungarian_tracking_on_series
@@ -3130,6 +3131,7 @@ class MainWindow(QMainWindow):
             n = run_hungarian_tracking_on_series(
                 self.series, start_sec, end_sec, prefix=prefix,
                 source_prefix=source_prefix, source_group=source_group,
+                apply_feedback=bool(feedback_choice[0][1]),
             )
         except Exception as e:
             notify(f"Hungarian tracking failed:\n{e}")
@@ -3160,12 +3162,13 @@ class MainWindow(QMainWindow):
             ["Model checkpoint", ("file", "", "PyTorch checkpoints (*.pt *.pth);;All files (*)")],
             ["Training epochs if no checkpoint", ("int", 20)],
             ["Max motion", ("float", 200.0)],
+            ["Expert constraints", ("check", ("Apply saved expert feedback", True))],
         ]
         response, confirmed = QuickDialog.get(self, structure, "Bayesian Transformer Tracking", spacing=10)
         if not confirmed:
             return
 
-        start_sec, end_sec, source_prefix, source_group, prefix, model_path, epochs, max_motion = response
+        start_sec, end_sec, source_prefix, source_group, prefix, model_path, epochs, max_motion, feedback_choice = response
 
         try:
             from pyrecon_connector import run_bayesian_tracking_on_series
@@ -3184,6 +3187,7 @@ class MainWindow(QMainWindow):
                 motion_threshold=max_motion,
                 source_prefix=source_prefix,
                 source_group=source_group,
+                apply_feedback=bool(feedback_choice[0][1]),
             )
         except Exception as e:
             notify(f"Bayesian Transformer tracking failed:\n{e}")
@@ -3339,11 +3343,11 @@ class MainWindow(QMainWindow):
         structure = [
             ["Import ImageJ ROI files or ZIPs. Folder/file names must contain Section or Sec followed by the section number."],
             ["DAPI ROI folder (optional)", ("dir", "")],
-            ["RNA ROI folder (optional)", ("dir", "")],
+            ["mRNA ROI folder (optional)", ("dir", "")],
             ["DAPI trace prefix", (True, "text", "dapi_")],
-            ["RNA trace prefix", (True, "text", "rna_")],
+            ["mRNA trace prefix", (True, "text", "rna_")],
             ["DAPI object group", (True, "text", "multiplex_dapi")],
-            ["RNA object group", (True, "text", "multiplex_rna_anchor")],
+            ["mRNA object group", (True, "text", "multiplex_rna_anchor")],
         ]
         response, confirmed = QuickDialog.get(self, structure, "Import Multiplex ROI Folders", spacing=10)
         if not confirmed:
@@ -3372,7 +3376,7 @@ class MainWindow(QMainWindow):
         self.seriesModified(True)
         notify(
             f"Multiplex ROI import done. DAPI: {result['dapi']}; "
-            f"RNA: {result['rna']}; skipped: {result['skipped']}."
+            f"mRNA: {result['rna']}; skipped: {result['skipped']}."
         )
 
     def runMultiplexRNAMapping(self):
@@ -3380,26 +3384,27 @@ class MainWindow(QMainWindow):
             notify("Open a real series first.")
             return
         structure = [
-            ["Map anchor RNA traces through tracked DAPI identities and a local DAPI deformation field."],
-            ["Mapping windows (anchor:targets)", (True, "text", "1:2-5;6:7-18;19:20-29;40:30-39")],
+            ["Map anchor mRNA traces through tracked DAPI identities and a local DAPI deformation field. Missing sections or traces are skipped and reported."],
+            ["Mapping windows (anchor:targets)", (True, "text", "1:2-3;6:4-14;23:15-31;40:32-39")],
             ["Tracked DAPI name prefix (optional)", ("text", "cell_")],
             ["Tracked DAPI object group (optional)", ("text", "")],
-            ["RNA name prefix (optional)", ("text", "rna_")],
-            ["RNA object group (optional)", ("text", "")],
-            ["Mapped RNA name prefix", (True, "text", "mapped_rna_")],
-            ["Maximum RNA-to-DAPI association distance", ("float", 15.0)],
+            ["mRNA name prefix (optional)", ("text", "rna_")],
+            ["mRNA object group (optional)", ("text", "")],
+            ["Mapped mRNA name prefix", (True, "text", "mapped_rna_")],
+            ["Maximum mRNA-to-DAPI association distance", ("float", 15.0)],
             ["Local neighbor tracks", ("int", 7)],
             ["High-confidence threshold", ("float", 0.70, (0.0, 1.0))],
             ["Output folder for CSV and QC plots", (True, "dir", "")],
             ["Existing mapped traces", ("check", ("Overwrite", False))],
+            ["Expert constraints", ("check", ("Apply saved expert feedback", True))],
         ]
-        response, confirmed = QuickDialog.get(self, structure, "Multiplex RNA Mapping", spacing=10)
+        response, confirmed = QuickDialog.get(self, structure, "Multiplex mRNA Mapping", spacing=10)
         if not confirmed:
             return
         (
             windows, dapi_prefix, dapi_group, rna_prefix, rna_group,
             mapped_prefix, max_distance, neighbors, confidence_threshold,
-            output_dir, overwrite_choice,
+            output_dir, overwrite_choice, feedback_choice,
         ) = response
         self.saveAllData()
         try:
@@ -3417,19 +3422,33 @@ class MainWindow(QMainWindow):
                 neighbor_count=neighbors,
                 high_confidence_threshold=confidence_threshold,
                 overwrite=bool(overwrite_choice[0][1]),
+                apply_feedback=bool(feedback_choice[0][1]),
             )
         except Exception as e:
-            notify(f"Multiplex RNA mapping failed:\n{e}")
+            notify(f"Multiplex mRNA mapping failed:\n{e}")
             return
         self.field.reload()
         self.field.table_manager.recreateTables()
         self.seriesModified(True)
+        missing_sections = ", ".join(str(value) for value in result.get("missing_series_sections", [])) or "none"
+        skipped_anchors = ", ".join(
+            str(item.get("section")) for item in result.get("skipped_anchor_sections", [])
+        ) or "none"
+        targets_without_dapi = ", ".join(
+            str(value) for value in result.get("target_sections_without_dapi", [])
+        ) or "none"
         notify(
-            f"RNA mapping done. Created {result['created']} traces: "
+            f"mRNA mapping done. Created {result['created']} traces: "
             f"{result['high_confidence']} high confidence, {result['review']} need review.\n"
-            f"Skipped: {result['skipped_unassociated']} unassociated RNA and "
-            f"{result['skipped_missing_track']} missing target tracks.\n\n"
-            f"CSV: {result.get('csv', '')}\nQC plots: {result.get('qc_dir', '')}"
+            f"Skipped: {result['skipped_unassociated']} unassociated mRNA and "
+            f"{result['skipped_missing_track']} missing target tracks.\n"
+            f"Unavailable series sections: {missing_sections}.\n"
+            f"Skipped anchor sections: {skipped_anchors}.\n"
+            f"Target sections without tracked DAPI: {targets_without_dapi}.\n\n"
+            f"Expert corrections applied: {result.get('feedback_applied', 0)}.\n"
+            f"CSV: {result.get('csv', '')}\n"
+            f"Summary: {result.get('summary_json', '')}\n"
+            f"QC plots: {result.get('qc_dir', '')}"
         )
 
     def reviewMultiplexMappings(self):
@@ -3437,7 +3456,7 @@ class MainWindow(QMainWindow):
             notify("Open a real series first.")
             return
         structure = [
-            ["Show", ("combo", ["mappings needing review", "high-confidence mappings", "all mapped RNA"], "mappings needing review")],
+            ["Show", ("combo", ["mappings needing review", "high-confidence mappings", "all mapped mRNA"], "mappings needing review")],
         ]
         response, confirmed = QuickDialog.get(self, structure, "Review Multiplex Mappings", spacing=10)
         if not confirmed:
@@ -3446,13 +3465,279 @@ class MainWindow(QMainWindow):
         filters = {
             "mappings needing review": "multiplex_mapping_review",
             "high-confidence mappings": "multiplex_mapping_high_confidence",
-            "all mapped RNA": "multiplex_mapped_rna",
+            "all mapped mRNA": "multiplex_mapped_rna",
         }
         self.series.setOption("roi_overlay_mode", "only matching")
         self.series.setOption("roi_overlay_filter", filters[choice])
         self.field.generateView(generate_image=False)
         self.seriesModified(True)
         notify("ROI display filtered for mapping review. Select and edit traces normally in PyReconstruct.")
+
+    def showExpertFeedbackWarning(self):
+        notify(
+            "⚠ HIGH-RISK EXPERT FEEDBACK\n\n"
+            "A correction can change DAPI identities and every mRNA ROI mapped from them. "
+            "Check the section number, ROI type, and both cells before marking a pair or trace line. "
+            "Feedback is saved in an auditable JSON sidecar and is applied only when the "
+            "'Apply saved expert feedback' option is enabled.\n\n"
+            "This tool applies deterministic constraints; it does not safely retrain a neural "
+            "network from one click."
+        )
+
+    def _feedbackAcknowledged(self, response):
+        acknowledged = bool(response[-1][0][1])
+        if not acknowledged:
+            notify("Feedback was not recorded. You must acknowledge the risk after checking the selected ROI(s).")
+        return acknowledged
+
+    def _isMultiplexROI(self, trace, kind):
+        name = str(trace.name).lower()
+        groups = {str(value).lower() for value in self.series.object_groups.getObjectGroups(trace.name)}
+        if kind == "rna":
+            return name.startswith("rna_") or "multiplex_rna_anchor" in groups
+        if kind == "dapi":
+            return (
+                name.startswith(("dapi_", "cell_", "bt_cell_"))
+                or bool(groups & {"multiplex_dapi", "multiplex_tracked_dapi"})
+            )
+        if kind == "mapped":
+            return name.startswith("mapped_rna_") or "multiplex_mapped_rna" in groups
+        return False
+
+    def recordRNADAPIFeedback(self):
+        selected = list(self.field.section.selected_traces)
+        if len(selected) != 2:
+            notify("Select exactly two ROIs on the current section: one anchor mRNA ROI and one DAPI ROI.")
+            return
+        rna = next((trace for trace in selected if self._isMultiplexROI(trace, "rna")), None)
+        dapi = next((trace for trace in selected if self._isMultiplexROI(trace, "dapi")), None)
+        if rna is None or dapi is None or rna is dapi:
+            notify("The selection must contain one anchor mRNA ROI (rna_) and one DAPI/tracked-DAPI ROI (dapi_ or cell_).")
+            return
+        structure = [
+            ["⚠ HIGH RISK: a wrong mRNA↔DAPI pair can move this mRNA cell incorrectly on many sections."],
+            [f"Section {self.field.section.n}: mRNA '{rna.name}' ↔ DAPI '{dapi.name}'"],
+            ["Pair assessment", ("combo", ["correct", "incorrect"], "incorrect")],
+            ["Notes (optional)", ("text", "")],
+            ["Required", ("check", ("I checked both ROI types, identities, and the section number", False))],
+        ]
+        response, confirmed = QuickDialog.get(self, structure, "Expert mRNA↔DAPI Feedback", spacing=10)
+        if not confirmed or not self._feedbackAcknowledged(response):
+            return
+        verdict, notes, _ = response
+        try:
+            from pyrecon_connector import add_feedback_record
+            add_feedback_record(
+                self.series, "rna_dapi_pair", verdict, self.field.section.n,
+                rna, secondary_trace=dapi, notes=notes,
+            )
+        except Exception as e:
+            notify(f"Could not save expert feedback:\n{e}")
+            return
+        rna.tags.add("expert_feedback_review")
+        dapi.tags.add("expert_feedback_review")
+        self.field.section.save(update_series_data=True)
+        self.series.object_groups.add("multiplex_expert_feedback", rna.name)
+        self.series.object_groups.add("multiplex_expert_feedback", dapi.name)
+        self.series.save()
+        self.field.generateView(generate_image=False)
+        notify(f"Saved '{verdict}' feedback for {rna.name} ↔ {dapi.name}.")
+
+    def recordDAPITrackFeedback(self):
+        selected = list(self.field.section.selected_traces)
+        if len(selected) != 1 or not self._isMultiplexROI(selected[0], "dapi"):
+            notify("Select exactly one tracked DAPI ROI on the current section.")
+            return
+        primary = selected[0]
+        current = int(self.field.section.n)
+        all_sections = sorted(int(value) for value in self.series.sections)
+        earlier = [value for value in all_sections if value < current]
+        default_other = earlier[-1] if earlier else (all_sections[1] if len(all_sections) > 1 else current)
+        structure = [
+            ["⚠ HIGH RISK: an incorrect track-link decision can split or merge a DAPI trajectory and alter downstream mRNA mappings."],
+            [f"Current section {current}: '{primary.name}'"],
+            ["Other section", ("int", default_other)],
+            ["DAPI ROI name on other section", (True, "text", primary.name)],
+            ["Track-link assessment", ("combo", ["correct", "incorrect"], "incorrect")],
+            ["Notes (optional)", ("text", "")],
+            ["Required", ("check", ("I inspected the trace line and both DAPI cells on both sections", False))],
+        ]
+        response, confirmed = QuickDialog.get(self, structure, "Expert DAPI Track Feedback", spacing=10)
+        if not confirmed or not self._feedbackAcknowledged(response):
+            return
+        other_section_num, other_name, verdict, notes, _ = response
+        if int(other_section_num) == current or int(other_section_num) not in self.series.sections:
+            notify("Choose a different section that exists in the open series.")
+            return
+        other_section = self.series.loadSection(int(other_section_num))
+        contour = other_section.contours.get(other_name)
+        if contour is None or not contour.traces:
+            notify(f"Could not find DAPI ROI '{other_name}' on section {other_section_num}.")
+            return
+        secondary = contour.traces[0]
+        if not self._isMultiplexROI(secondary, "dapi"):
+            notify(f"'{other_name}' is not classified as a DAPI ROI.")
+            return
+        try:
+            from pyrecon_connector import add_feedback_record
+            add_feedback_record(
+                self.series, "dapi_track_link", verdict, current,
+                primary, secondary_trace=secondary, secondary_section=int(other_section_num), notes=notes,
+            )
+        except Exception as e:
+            notify(f"Could not save expert feedback:\n{e}")
+            return
+        primary.tags.add("expert_feedback_review")
+        secondary.tags.add("expert_feedback_review")
+        self.field.section.save(update_series_data=True)
+        other_section.save(update_series_data=True)
+        self.series.object_groups.add("multiplex_expert_feedback", primary.name)
+        self.series.object_groups.add("multiplex_expert_feedback", secondary.name)
+        self.series.save()
+        self.field.generateView(generate_image=False)
+        notify(
+            f"Saved '{verdict}' DAPI track-link feedback for sections "
+            f"{current} and {other_section_num}. Re-run Hungarian tracking with feedback enabled to apply it."
+        )
+
+    def recordMappedRNAFeedback(self):
+        selected = list(self.field.section.selected_traces)
+        if len(selected) != 1 or not self._isMultiplexROI(selected[0], "mapped"):
+            notify("Select exactly one mapped mRNA ROI (mapped_rna_) on the current section.")
+            return
+        mapped = selected[0]
+        structure = [
+            ["⚠ HIGH RISK: approve only when this mapped mRNA ROI is on the correct cell and has plausible geometry."],
+            [f"Section {self.field.section.n}: '{mapped.name}'"],
+            ["Mapped ROI assessment", ("combo", ["correct", "incorrect"], "incorrect")],
+            ["Notes (optional)", ("text", "")],
+            ["Required", ("check", ("I checked the source identity, target cell, section, and ROI boundary", False))],
+        ]
+        response, confirmed = QuickDialog.get(self, structure, "Expert Mapped mRNA Feedback", spacing=10)
+        if not confirmed or not self._feedbackAcknowledged(response):
+            return
+        verdict, notes, _ = response
+        try:
+            from pyrecon_connector import add_feedback_record
+            add_feedback_record(
+                self.series, "mapped_rna", verdict, self.field.section.n, mapped, notes=notes,
+            )
+        except Exception as e:
+            notify(f"Could not save expert feedback:\n{e}")
+            return
+        mapped.tags.add("expert_feedback_review")
+        mapped.tags.add(f"expert_{verdict}")
+        self.field.section.save(update_series_data=True)
+        self.series.object_groups.add("multiplex_expert_feedback", mapped.name)
+        self.series.save()
+        self.field.generateView(generate_image=False)
+        notify(f"Saved '{verdict}' feedback for mapped mRNA ROI '{mapped.name}'.")
+
+    def generateExpertFeedbackReport(self):
+        if self.series and self.series.isWelcomeSeries():
+            notify("Open a real series first.")
+            return
+        structure = [
+            ["Creates separate DAPI, anchor mRNA, and mapped mRNA inventories plus DAPI trajectory plots."],
+            ["Tracked DAPI prefix", (True, "text", "cell_")],
+            ["Anchor mRNA prefix", (True, "text", "rna_")],
+            ["Mapped mRNA prefix", (True, "text", "mapped_rna_")],
+            ["Output folder", (True, "dir", self.series.getwdir())],
+        ]
+        response, confirmed = QuickDialog.get(self, structure, "Expert Feedback Review Report", spacing=10)
+        if not confirmed:
+            return
+        dapi_prefix, rna_prefix, mapped_prefix, output_dir = response
+        self.saveAllData()
+        try:
+            from pyrecon_connector import write_feedback_review
+            result = write_feedback_review(
+                self.series, output_dir, prefixes=(dapi_prefix, rna_prefix, mapped_prefix)
+            )
+        except Exception as e:
+            notify(f"Could not create feedback report:\n{e}")
+            return
+        notify(
+            f"Feedback report created.\nDAPI: {result['counts'].get('dapi', 0)}; "
+            f"anchor mRNA: {result['counts'].get('anchor_mrna', 0)}; "
+            f"mapped mRNA: {result['counts'].get('mapped_mrna', 0)}; "
+            f"feedback records: {result['total']}.\n\n"
+            f"Inventory: {result['inventory_csv']}\n"
+            f"DAPI track plot: {result['dapi_track_plot']}\n"
+            f"mRNA ROI plot: {result['mrna_roi_plot']}\n"
+            f"Summary: {result['summary_json']}"
+        )
+
+    def validateMultiplexMappings(self):
+        if self.series and self.series.isWelcomeSeries():
+            notify("Open a real series first.")
+            return
+        structure = [
+            ["Compare mapped mRNA ROIs with independent expert ROIs using one-to-one centroid matching."],
+            ["Mapped mRNA prefix", (True, "text", "mapped_rna_")],
+            ["Mapped mRNA group (optional)", ("text", "multiplex_mapped_rna")],
+            ["Expert ROI prefix", (True, "text", "expert_rna_")],
+            ["Expert ROI group (optional)", ("text", "")],
+            ["Maximum centroid distance", ("float", 15.0)],
+            ["Output folder", (True, "dir", self.series.getwdir())],
+        ]
+        response, confirmed = QuickDialog.get(self, structure, "Validate Mapped mRNA", spacing=10)
+        if not confirmed:
+            return
+        predicted_prefix, predicted_group, expert_prefix, expert_group, distance, output_dir = response
+        self.saveAllData()
+        try:
+            from pyrecon_connector import validate_mapped_rna
+            result = validate_mapped_rna(
+                self.series, output_dir, predicted_prefix, predicted_group,
+                expert_prefix, expert_group, distance,
+            )
+        except Exception as e:
+            notify(f"Mapped mRNA validation failed:\n{e}")
+            return
+        notify(
+            f"Validation finished. TP {result['tp']}; FP {result['fp']}; FN {result['fn']}.\n"
+            f"Precision {result['precision']:.3f}; recall {result['recall']:.3f}; F1 {result['f1']:.3f}.\n\n"
+            f"Important: metrics require independent, complete expert ROIs.\n"
+            f"CSV: {result['csv']}\nSummary: {result['summary_json']}"
+        )
+
+    def measureMultiplexAntibodyIntensity(self):
+        if self.series and self.series.isWelcomeSeries():
+            notify("Open a real series first.")
+            return
+        structure = [
+            ["Measure antibody TIFF intensity inside mapped mRNA ROIs. Missing TIFF sections are skipped and reported."],
+            ["Antibody TIFF folder", (True, "dir", "")],
+            ["Mapped mRNA prefix", (True, "text", "mapped_rna_")],
+            ["Mapped mRNA group (optional)", ("text", "multiplex_mapped_rna")],
+            ["TIFF channel index", ("int", 0)],
+            ["Exploratory positivity threshold", ("combo", ["median + 3 MAD", "median + 2 MAD", "95th percentile"], "median + 3 MAD")],
+            ["Output folder", (True, "dir", self.series.getwdir())],
+        ]
+        response, confirmed = QuickDialog.get(self, structure, "Mapped mRNA Antibody Intensity", spacing=10)
+        if not confirmed:
+            return
+        tiff_folder, roi_prefix, roi_group, channel, threshold_method, output_dir = response
+        self.saveAllData()
+        try:
+            from pyrecon_connector import measure_antibody_intensity
+            result = measure_antibody_intensity(
+                self.series, tiff_folder, output_dir, roi_prefix, roi_group,
+                channel, threshold_method,
+            )
+        except Exception as e:
+            notify(f"Antibody intensity analysis failed:\n{e}")
+            return
+        missing = ", ".join(str(value) for value in result["missing_tiff_sections"]) or "none"
+        notify(
+            f"Intensity analysis finished. Measured {result['measured_rois']} mapped mRNA ROIs; "
+            f"{result['positive_rois']} exceeded the exploratory threshold.\n"
+            f"Missing TIFF sections: {missing}.\n\n"
+            f"WARNING: confirm positivity with controls or expert labels.\n"
+            f"Measurements: {result['measurements_csv']}\n"
+            f"Scatter: {result['scatter_plot']}\nOverlays: {result['overlay_dir']}"
+        )
 
     def configureImageChannels(self):
         if self.series and self.series.isWelcomeSeries():
@@ -3522,18 +3807,42 @@ class MainWindow(QMainWindow):
         if self.series and self.series.isWelcomeSeries():
             notify("Open a real series first.")
             return
-        mode = self.series.getOption("roi_overlay_mode") or "all"
-        filter_value = self.series.getOption("roi_overlay_filter") or ""
+        labels = bool(self.series.getOption("roi_overlay_labels"))
+        presets = [
+            "show all", "show none", "DAPI ROIs only", "tracked DAPI only",
+            "anchor mRNA only", "mapped mRNA only", "DAPI + anchor mRNA",
+            "DAPI + mapped mRNA", "feedback review only", "custom filter",
+        ]
         structure = [
-            ["ROI display", ("combo", ["all", "hide all", "only matching", "exclude matching"], mode)],
-            ["Groups, tags, or names", ("text", filter_value)],
+            ["Fiji ROI Manager-style visibility: choose a layer set, then optionally display ROI names."],
+            ["ROI layer preset", ("combo", presets, "show all")],
+            ["Custom groups, tags, or names (comma-separated)", ("text", self.series.getOption("roi_overlay_filter") or "")],
+            ["Labels", ("check", ("Show ROI names", labels))],
         ]
         response, confirmed = QuickDialog.get(self, structure, "ROI Overlay Display", spacing=10)
         if not confirmed:
             return
-        mode, filter_value = response
+        preset, custom_filter, labels_choice = response
+        filters = {
+            "DAPI ROIs only": "multiplex_dapi,multiplex_tracked_dapi,dapi_,cell_,bt_cell_",
+            "tracked DAPI only": "multiplex_tracked_dapi,cell_,bt_cell_",
+            "anchor mRNA only": "multiplex_rna_anchor,rna_",
+            "mapped mRNA only": "multiplex_mapped_rna,mapped_rna_",
+            "DAPI + anchor mRNA": "multiplex_dapi,multiplex_tracked_dapi,dapi_,cell_,bt_cell_,multiplex_rna_anchor,rna_",
+            "DAPI + mapped mRNA": "multiplex_dapi,multiplex_tracked_dapi,dapi_,cell_,bt_cell_,multiplex_mapped_rna,mapped_rna_",
+            "feedback review only": "multiplex_expert_feedback,expert_feedback_review,multiplex_mapping_review",
+        }
+        if preset == "show all":
+            mode, filter_value = "all", ""
+        elif preset == "show none":
+            mode, filter_value = "hide all", ""
+        elif preset == "custom filter":
+            mode, filter_value = "only matching", custom_filter
+        else:
+            mode, filter_value = "only matching", filters[preset]
         self.series.setOption("roi_overlay_mode", mode)
         self.series.setOption("roi_overlay_filter", filter_value)
+        self.series.setOption("roi_overlay_labels", bool(labels_choice[0][1]))
         self.field.generateView(generate_image=False)
         self.seriesModified(True)
         notify("ROI overlay display updated.")

@@ -10,7 +10,7 @@ if __name__ == "__main__":
     # set up imports for run.py location
     run_script = Path(__file__)
     pypath = str(run_script.parents[1])
-    sys.path.append(pypath)
+    sys.path.insert(0, pypath)
 
 
 import PyReconstruct.modules.gui.main as main

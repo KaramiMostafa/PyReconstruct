@@ -1,0 +1,105 @@
+PYRECONSTRUCT CUSTOM VERSION - WINDOWS INSTALL
+================================================
+
+Important:
+- Do not use the system Python 3.14 for this project.
+- This environment creates and uses its own compatible Python 3.11.
+- Run these commands in Anaconda Prompt or a Windows Terminal where conda works.
+
+The two repositories must be beside one another like this:
+
+GitHub\
+  PyReconstruct\
+  PyReconstruct_connector_tracking_plugin\
+
+
+1. Go to the parent GitHub folder
+---------------------------------
+
+cd C:\Users\YOUR_USERNAME\Desktop\JJ\GitHub
+
+
+2. Make sure both customized branches are present
+-------------------------------------------------
+
+cd PyReconstruct
+git switch cellpose-custom-model
+git rev-parse --short HEAD
+cd ..
+
+If the connector has not been cloned yet:
+
+git clone https://github.com/KaramiMostafa/PyReconstruct_connector_tracking_plugin.git
+
+cd PyReconstruct_connector_tracking_plugin
+git switch cellpose-custom-model
+git rev-parse --short HEAD
+cd ..
+
+
+3. Create the clean Python 3.11 environment
+-------------------------------------------
+
+conda env create -f .\PyReconstruct\environment_windows.yml
+conda activate pyreconstruct-custom
+
+Check that this environment is not using Python 3.14:
+
+python --version
+
+It should print Python 3.11.x.
+
+
+4. Install both local customized repositories
+----------------------------------------------
+
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -e .\PyReconstruct
+python -m pip install -e .\PyReconstruct_connector_tracking_plugin
+
+
+5. Verify that Python sees the customized local copy
+----------------------------------------------------
+
+python -c "import PyReconstruct; print(PyReconstruct.__file__)"
+python -c "import pyrecon_connector; print(pyrecon_connector.__file__)"
+
+Both paths should point inside the two cloned GitHub folders, not an unrelated
+Conda site-packages copy.
+
+
+6. Start the customized program
+-------------------------------
+
+cd .\PyReconstruct
+python -m PyReconstruct.run
+
+Open the Plug-In menu. It should contain Tracking, Segmentation, and Multiplex
+RNA mapping. It should also contain "Expert feedback (HIGH RISK)" at the top.
+
+Verify the Cellpose/PyTorch dependencies:
+
+python -c "import torch, torchvision, cellpose; print(torch.__version__, torchvision.__version__)"
+
+If this import fails, do not install packages with system Python 3.14. Confirm
+that "(pyreconstruct-custom)" is visible in the prompt, then rerun:
+
+python -m pip install --force-reinstall "torch==2.5.1" "torchvision==0.20.1"
+python -m pip install -e .\PyReconstruct_connector_tracking_plugin
+
+
+If conda activate is not recognized in PowerShell
+-------------------------------------------------
+
+Run:
+
+conda init powershell
+
+Close Windows Terminal completely, open it again, and repeat from step 3.
+
+
+If environment creation was interrupted and must be retried
+------------------------------------------------------------
+
+conda env remove -n pyreconstruct-custom -y
+conda env create -f .\PyReconstruct\environment_windows.yml

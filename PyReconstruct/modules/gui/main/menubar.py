@@ -437,6 +437,19 @@ def return_plugin_menu(self):
         "text": "Plug-In",
         "opts": [
             {
+                "attr_name": "expertfeedbackpluginmenu",
+                "text": "⚠ Expert feedback (HIGH RISK)",
+                "opts": [
+                    ("feedback_warning_act", "⚠ Read safety warning first...", "", self.showExpertFeedbackWarning),
+                    None,
+                    ("feedback_rna_dapi_act", "Mark selected mRNA ↔ DAPI pair...", "", self.recordRNADAPIFeedback),
+                    ("feedback_dapi_track_act", "Mark selected DAPI track link...", "", self.recordDAPITrackFeedback),
+                    ("feedback_mapped_rna_act", "Mark selected mapped mRNA ROI...", "", self.recordMappedRNAFeedback),
+                    None,
+                    ("feedback_report_act", "Create separate ROI/track review report...", "", self.generateExpertFeedbackReport),
+                ]
+            },
+            {
                 "attr_name": "trackingpluginmenu",
                 "text": "Tracking",
                 "opts": [
@@ -457,16 +470,18 @@ def return_plugin_menu(self):
                 "text": "Channels / overlays",
                 "opts": [
                     ("configure_image_channels_act", "Channels tool...", "", self.configureImageChannels),
-                    ("configure_roi_overlay_act", "ROI overlay display...", "", self.configureROIOverlay),
+                    ("configure_roi_overlay_act", "ROI Manager-style layers and labels...", "", self.configureROIOverlay),
                 ]
             },
             {
                 "attr_name": "multiplexmappingpluginmenu",
-                "text": "Multiplex RNA mapping",
+                "text": "Multiplex mRNA mapping",
                 "opts": [
-                    ("import_multiplex_rois_act", "1. Import DAPI/RNA ROI folders...", "", self.importMultiplexROIFolders),
-                    ("run_multiplex_mapping_act", "2. Map RNA through DAPI tracks...", "", self.runMultiplexRNAMapping),
-                    ("review_multiplex_mapping_act", "3. Review mapped RNA...", "", self.reviewMultiplexMappings),
+                    ("import_multiplex_rois_act", "1. Import DAPI/mRNA ROI folders...", "", self.importMultiplexROIFolders),
+                    ("run_multiplex_mapping_act", "2. Map mRNA through DAPI tracks...", "", self.runMultiplexRNAMapping),
+                    ("review_multiplex_mapping_act", "3. Review mapped mRNA...", "", self.reviewMultiplexMappings),
+                    ("validate_multiplex_mapping_act", "4. Validate against expert ROIs...", "", self.validateMultiplexMappings),
+                    ("measure_multiplex_intensity_act", "5. Measure antibody intensity...", "", self.measureMultiplexAntibodyIntensity),
                 ]
             }
         ]

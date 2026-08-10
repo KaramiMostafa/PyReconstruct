@@ -679,6 +679,7 @@ class Series():
             "image_channel_alpha"      : 1.0,
             "roi_overlay_mode"         : "all",
             "roi_overlay_filter"       : "",
+            "roi_overlay_labels"       : False,
             
         }
 

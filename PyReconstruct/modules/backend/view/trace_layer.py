@@ -311,6 +311,19 @@ class TraceLayer():
                     painter.setOpacity(1)
                     
                 painter.drawPolygon(qpoints)
+
+            if self.series.getOption("roi_overlay_labels"):
+                painter.setOpacity(1)
+                drawOutlinedText(
+                    painter,
+                    int((xmin + xmax) / 2),
+                    int((ymin + ymax) / 2),
+                    str(trace.name),
+                    tuple(draw_color),
+                    (0, 0, 0),
+                    11,
+                )
+            painter.end()
         
             return True
 
