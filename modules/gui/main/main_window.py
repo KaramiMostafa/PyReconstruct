@@ -3253,9 +3253,19 @@ class MainWindow(QMainWindow):
 
         self.saveAllData()
 
+        from PyReconstruct.modules.backend.view.channel_utils import get_section_channel_count
+        channel_count = get_section_channel_count(self.field.section)
         current_channel = int(self.series.getOption("image_channel_single") or 0)
+        channel_mode = self.series.getOption("image_channel_mode") or "auto"
+        current_channels = str(
+            self.series.getOption("image_channel_overlay") or current_channel
+            if channel_mode == "overlay"
+            else current_channel
+        )
+        current_channels = ",".join(current_channels.replace(";", ",").split(",")[:3])
         structure = [
-            ["Image channel index", ("int", current_channel)],
+            [f"Detected channels: {channel_count} (indexes 0-{channel_count - 1})"],
+            ["Image channel indexes (up to 3, comma-separated)", ("text", current_channels)],
             ["Prefix", (True, "text", "cpsam_roi_")],
             ["Diameter", ("float", 0.0)],
             ["Minimum ROI area in pixels", ("int", 25)],
@@ -3265,7 +3275,21 @@ class MainWindow(QMainWindow):
         if not confirmed:
             return
 
-        channel, prefix, diameter, min_area, gpu_choice = response
+        channel_text, prefix, diameter, min_area, gpu_choice = response
+        try:
+            channels = []
+            for value in str(channel_text).replace(";", ",").split(","):
+                if value.strip():
+                    channel = int(value.strip())
+                    if channel not in channels:
+                        channels.append(channel)
+            if not channels or len(channels) > 3:
+                raise ValueError("Select between one and three channels.")
+            if any(channel < 0 or channel >= channel_count for channel in channels):
+                raise ValueError(f"Channel indexes must be between 0 and {channel_count - 1}.")
+        except Exception as e:
+            notify(f"Invalid Cellpose-SAM channel selection:\n{e}")
+            return
         use_gpu = bool(gpu_choice[0][1])
         diameter = None if diameter <= 0 else diameter
 
@@ -3283,7 +3307,7 @@ class MainWindow(QMainWindow):
                 diameter=diameter,
                 min_area=min_area,
                 gpu=use_gpu,
-                channel=channel,
+                channels=channels,
             )
         except Exception as e:
             notify(f"Cellpose-SAM segmentation failed:\n{e}")
