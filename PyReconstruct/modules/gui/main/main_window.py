@@ -3098,10 +3098,9 @@ class MainWindow(QMainWindow):
 
     def runHungarianTracking(self):
         if self.series and self.series.isWelcomeSeries():
-            notify("Open a real series first (not the welcome series).")
+            notify("Open a real series first.")
             return
 
-        # Make sure current edits are on disk before loading sections
         self.saveAllData()
 
         all_secs = sorted(list(self.series.sections.keys()))
@@ -3113,21 +3112,22 @@ class MainWindow(QMainWindow):
             ["From section", ("int", all_secs[0]), "to section", ("int", all_secs[-1]), " "],
             ["Prefix", (True, "text", "cell_")],
         ]
-        response, confirmed = QuickDialog.get(self, structure, "Run Hungarian Tracking", spacing=10)
+        response, confirmed = QuickDialog.get(self, structure, "Hungarian Tracking", spacing=10)
         if not confirmed:
             return
+
         start_sec, end_sec, prefix = response[0], response[1], response[2]
 
         try:
             from pyrecon_connector import run_hungarian_tracking_on_series
-        except Exception:
-            notify("Connector not installed in this venv. Run: pip install -e PyReconstruct_connector_tracking_plugin")
+        except Exception as e:
+            notify(f"Connector is not installed in this environment.\n\nRun:\npip install -e /path/to/PyReconstruct_Tracking_PlugIn_Hungarian\npip install -e /path/to/PyReconstruct_connector_tracking_plugin\n\nError:\n{e}")
             return
 
         try:
             n = run_hungarian_tracking_on_series(self.series, start_sec, end_sec, prefix=prefix)
         except Exception as e:
-            notify(f"Tracking failed:\n{e}")
+            notify(f"Hungarian tracking failed:\n{e}")
             return
 
         self.field.reload()
@@ -3135,12 +3135,253 @@ class MainWindow(QMainWindow):
         self.seriesModified(True)
         notify(f"Hungarian tracking done. Renamed {n} traces.")
 
-    def runAdvancedTracking(self):
-        # Minimal proof that the menu works
+    def runBayesianTracking(self):
         if self.series and self.series.isWelcomeSeries():
-            notify("Open a real series first (not the welcome series).")
+            notify("Open a real series first.")
             return
-        notify("Advanced tracking clicked. (Next: call your connector/core here.)")
+
+        self.saveAllData()
+
+        all_secs = sorted(list(self.series.sections.keys()))
+        if len(all_secs) < 2:
+            notify("Need at least 2 sections.")
+            return
+
+        structure = [
+            ["From section", ("int", all_secs[0]), "to section", ("int", all_secs[-1]), " "],
+            ["Prefix", (True, "text", "bt_cell_")],
+            ["Model checkpoint", ("file", "", "PyTorch checkpoints (*.pt *.pth);;All files (*)")],
+            ["Training epochs if no checkpoint", ("int", 20)],
+            ["Max motion", ("float", 200.0)],
+        ]
+        response, confirmed = QuickDialog.get(self, structure, "Bayesian Transformer Tracking", spacing=10)
+        if not confirmed:
+            return
+
+        start_sec, end_sec, prefix, model_path, epochs, max_motion = response
+
+        try:
+            from pyrecon_connector import run_bayesian_tracking_on_series
+        except Exception as e:
+            notify(f"Bayesian connector is not installed in this environment.\n\nRun:\npip install -e /path/to/PyReconstruct_Tracking_PlugIn_BayesianTransformer\npip install -e /path/to/PyReconstruct_connector_tracking_plugin\n\nError:\n{e}")
+            return
+
+        try:
+            n = run_bayesian_tracking_on_series(
+                self.series,
+                start_sec,
+                end_sec,
+                prefix=prefix,
+                model_path=model_path,
+                train_epochs=epochs,
+                motion_threshold=max_motion,
+            )
+        except Exception as e:
+            notify(f"Bayesian Transformer tracking failed:\n{e}")
+            return
+
+        self.field.reload()
+        self.field.table_manager.recreateTables()
+        self.seriesModified(True)
+        notify(f"Bayesian Transformer tracking done. Renamed {n} traces.")
+
+    def runUnetSegmentation(self):
+        if self.series and self.series.isWelcomeSeries():
+            notify("Open a real series first.")
+            return
+
+        if not self.field.section_layer.image_found:
+            notify("The current section image was not found.")
+            return
+
+        self.saveAllData()
+
+        current_channel = int(self.series.getOption("image_channel_single") or 0)
+        structure = [
+            ["Model", ("combo", ["built-in fluorescence nuclei U-Net", "custom checkpoint"], "built-in fluorescence nuclei U-Net")],
+            ["Custom checkpoint", ("file", "", "PyTorch checkpoints (*.pt *.pth);;All files (*)")],
+            ["Image channel index", ("int", current_channel)],
+            ["Prefix", (True, "text", "unet_roi_")],
+            ["Foreground threshold", ("float", 0.5)],
+            ["Boundary threshold", ("float", 0.5)],
+            ["Minimum ROI area in pixels", ("int", 25)],
+            ["Device", ("combo", ["cpu", "auto", "cuda"], "cpu")],
+        ]
+        response, confirmed = QuickDialog.get(self, structure, "Pre-trained U-Net Microscopy Segmentation", spacing=10)
+        if not confirmed:
+            return
+
+        model_choice, checkpoint_path, channel, prefix, threshold, boundary_threshold, min_area, device = response
+        model_source = "builtin" if model_choice.startswith("built-in") else "custom"
+
+        try:
+            from pyrecon_connector import run_unet_segmentation_on_section
+        except Exception as e:
+            notify(f"Segmentation connector is not installed in this environment.\n\nRun:\npip install -e /path/to/PyReconstruct_connector_tracking_plugin\n\nError:\n{e}")
+            return
+
+        try:
+            n = run_unet_segmentation_on_section(
+                self.series,
+                self.series.current_section,
+                checkpoint_path=checkpoint_path,
+                model_source=model_source,
+                channel=channel,
+                prefix=prefix,
+                threshold=threshold,
+                boundary_threshold=boundary_threshold,
+                min_area=min_area,
+                device=device,
+            )
+        except Exception as e:
+            notify(f"U-Net segmentation failed:\n{e}")
+            return
+
+        self.field.reload()
+        self.field.table_manager.recreateTables()
+        self.seriesModified(True)
+        notify(f"U-Net segmentation done. Created {n} ROI traces on section {self.series.current_section}.")
+
+    def runCellposeSAMSegmentation(self):
+        if self.series and self.series.isWelcomeSeries():
+            notify("Open a real series first.")
+            return
+
+        if not self.field.section_layer.image_found:
+            notify("The current section image was not found.")
+            return
+
+        self.saveAllData()
+
+        current_channel = int(self.series.getOption("image_channel_single") or 0)
+        structure = [
+            ["Model", ("combo", ["built-in Cellpose-SAM", "custom Cellpose/SAM model"], "built-in Cellpose-SAM")],
+            ["Custom model/checkpoint", ("file", "", "Cellpose model files (*);;PyTorch files (*.pt *.pth);;All files (*)")],
+            ["Image channel index", ("int", current_channel)],
+            ["Prefix", (True, "text", "cpsam_roi_")],
+            ["Diameter", ("float", 0.0)],
+            ["Minimum ROI area in pixels", ("int", 25)],
+            ["Use GPU", ("check", ("GPU", False))],
+        ]
+        response, confirmed = QuickDialog.get(self, structure, "Cellpose-SAM Segmentation", spacing=10)
+        if not confirmed:
+            return
+
+        model_choice, custom_model_path, channel, prefix, diameter, min_area, gpu_choice = response
+        model_source = "custom" if model_choice.startswith("custom") else "builtin"
+        use_gpu = bool(gpu_choice[0][1])
+        diameter = None if diameter <= 0 else diameter
+
+        try:
+            from pyrecon_connector import run_cellpose_sam_segmentation_on_section
+        except Exception as e:
+            notify(f"Cellpose-SAM connector is not installed in this environment.\n\nRun:\npip install -e /path/to/PyReconstruct_connector_tracking_plugin\n\nError:\n{e}")
+            return
+
+        try:
+            n = run_cellpose_sam_segmentation_on_section(
+                self.series,
+                self.series.current_section,
+                prefix=prefix,
+                diameter=diameter,
+                min_area=min_area,
+                gpu=use_gpu,
+                channel=channel,
+                model_source=model_source,
+                model_path=custom_model_path,
+            )
+        except Exception as e:
+            notify(f"Cellpose-SAM segmentation failed:\n{e}")
+            return
+
+        self.field.reload()
+        self.field.table_manager.recreateTables()
+        self.seriesModified(True)
+        notify(f"Cellpose-SAM segmentation done. Created {n} ROI traces on section {self.series.current_section}.")
+
+    def configureImageChannels(self):
+        if self.series and self.series.isWelcomeSeries():
+            notify("Open a real series first.")
+            return
+        if not self.field.section_layer.image_found:
+            notify("The current section image was not found.")
+            return
+        try:
+            from PyReconstruct.modules.backend.view.channel_utils import get_section_channel_count
+            from PyReconstruct.modules.gui.dialog.channel_display import ChannelDisplayDialog
+            n_channels = get_section_channel_count(self.field.section)
+        except Exception as e:
+            notify(f"Could not read image channels:\n{e}")
+            return
+
+        mode = self.series.getOption("image_channel_mode") or "auto"
+        single = int(self.series.getOption("image_channel_single") or 0)
+        overlay = self.series.getOption("image_channel_overlay") or "0,1,2"
+        alpha = float(self.series.getOption("image_channel_alpha") or 1.0)
+
+        def parse_selected(value):
+            selected = []
+            for item in str(value).replace(";", ",").split(","):
+                item = item.strip()
+                if not item:
+                    continue
+                try:
+                    idx = int(item)
+                except Exception:
+                    continue
+                if 0 <= idx < n_channels and idx not in selected:
+                    selected.append(idx)
+            return selected
+
+        if mode == "none":
+            selected = []
+        elif mode == "single":
+            selected = [max(0, min(single, n_channels - 1))]
+        else:
+            selected = parse_selected(overlay)
+            if not selected:
+                selected = list(range(min(3, n_channels)))
+
+        def apply_channels(new_mode, new_single, new_overlay, new_alpha):
+            self.series.setOption("image_channel_mode", new_mode)
+            self.series.setOption("image_channel_single", max(0, int(new_single)))
+            self.series.setOption("image_channel_overlay", str(new_overlay))
+            self.series.setOption("image_channel_alpha", float(new_alpha))
+            self.field.reloadImage()
+            self.seriesModified(True)
+
+        values, confirmed = ChannelDisplayDialog.get(
+            self,
+            n_channels,
+            selected_channels=selected,
+            alpha=alpha,
+            apply_callback=apply_channels,
+        )
+        if not confirmed:
+            apply_channels(mode, single, overlay, alpha)
+            return
+        apply_channels(*values)
+        notify("Channel display updated.")
+
+    def configureROIOverlay(self):
+        if self.series and self.series.isWelcomeSeries():
+            notify("Open a real series first.")
+            return
+        mode = self.series.getOption("roi_overlay_mode") or "all"
+        filter_value = self.series.getOption("roi_overlay_filter") or ""
+        structure = [
+            ["ROI display", ("combo", ["all", "hide all", "only matching", "exclude matching"], mode)],
+            ["Groups, tags, or names", ("text", filter_value)],
+        ]
+        response, confirmed = QuickDialog.get(self, structure, "ROI Overlay Display", spacing=10)
+        if not confirmed:
+            return
+        mode, filter_value = response
+        self.series.setOption("roi_overlay_mode", mode)
+        self.series.setOption("roi_overlay_filter", filter_value)
+        self.field.generateView(generate_image=False)
+        self.seriesModified(True)
+        notify("ROI overlay display updated.")
 
 
 qdark_addon = """

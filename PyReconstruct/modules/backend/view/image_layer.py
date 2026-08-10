@@ -27,6 +27,13 @@ from PyReconstruct.modules.datatypes import (
 )
 from PyReconstruct.modules.calc import fieldPointToPixmap
 from PyReconstruct.modules.constants import assets_dir
+from .channel_utils import (
+    channel_count_from_array,
+    compose_display_qimage,
+    crop_array_spatial,
+    get_section_display_qimage,
+    spatial_shape_from_array,
+)
 
 class ImageLayer():
 
@@ -70,18 +77,26 @@ class ImageLayer():
                 self.image_found = False
             if self.image_found:
                 self.image = self.zg[f"scale_{self.selected_scale}"][self.section.src]
-                self.bh, self.bw = (n * self.selected_scale for n in self.image.shape)
+                h, w = spatial_shape_from_array(self.image)
+                self.bh, self.bw = h * self.selected_scale, w * self.selected_scale
+                self.channel_count = channel_count_from_array(self.image)
                 self.base_corners = [(0, 0), (0, self.bh), (self.bw, self.bh), (self.bw, 0)]
                 self.image_found = True
         
         # if saved as normal images
         else:
             src_path = self.section.src_fp
-            self.image = QImage(src_path)
+            try:
+                self.image, self.channel_count, spatial_shape = get_section_display_qimage(self.section, self.series)
+                h, w = spatial_shape
+            except Exception:
+                self.image = QImage(src_path)
+                self.channel_count = 1
+                h, w = self.image.height(), self.image.width()
             if self.image.isNull():
                 self.image_found = False
             else:
-                self.bw, self.bh = self.image.width(), self.image.height()
+                self.bw, self.bh = w, h
                 self.base_corners = [(0, 0), (0, self.bh), (self.bw, self.bh), (self.bw, 0)]
                 self.image_found = True
     
@@ -242,17 +257,14 @@ class ImageLayer():
             # scale the cropping values accordingly
             xmins, ymins, xmaxs, ymaxs = (round(n / scale_level) for n in bounds)
             ihs = round(ih / scale_level)
-            zarr_saved = self.image[
-                ihs - ymaxs: ihs - ymins,
-                xmins:xmaxs
-            ]
-            im_crop = QImage(
-                zarr_saved.data,
-                xmaxs-xmins,
-                ymaxs-ymins,
-                zarr_saved.strides[0],
-                QImage.Format.Format_Grayscale8
+            zarr_saved = crop_array_spatial(
+                self.image,
+                xmins,
+                xmaxs,
+                ihs - ymaxs,
+                ihs - ymins,
             )
+            im_crop = compose_display_qimage(zarr_saved, self.series)
         else:
             crop_rect = QRect(
                 xmin,

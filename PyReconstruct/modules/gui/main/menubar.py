@@ -431,20 +431,39 @@ def return_help_menu(self):
         ]
     }
 
-def return_tracking_menu(self):
-    """Return tracking menu."""
+def return_plugin_menu(self):
     return {
-        "attr_name": "trackingmenu",
-        "text": "Tracking",
+        "attr_name": "pluginmenu",
+        "text": "Plug-In",
         "opts": [
-            ("run_hungarian_tracking_act", "Run Hungarian tracking...", "", self.runHungarianTracking),
-            ("run_advanced_tracking_act", "Run Advanced tracking...", "", self.runAdvancedTracking),
+            {
+                "attr_name": "trackingpluginmenu",
+                "text": "Tracking",
+                "opts": [
+                    ("run_hungarian_tracking_act", "Hungarian tracking...", "", self.runHungarianTracking),
+                    ("run_bayesian_tracking_act", "Bayesian Transformer tracking...", "", self.runBayesianTracking),
+                ]
+            },
+            {
+                "attr_name": "segmentationpluginmenu",
+                "text": "Segmentation",
+                "opts": [
+                    ("run_unet_segmentation_act", "Pre-trained U-Net microscopy...", "", self.runUnetSegmentation),
+                    ("run_cellpose_sam_segmentation_act", "Cellpose-SAM...", "", self.runCellposeSAMSegmentation),
+                ]
+            },
+            {
+                "attr_name": "channelpluginmenu",
+                "text": "Channels / overlays",
+                "opts": [
+                    ("configure_image_channels_act", "Channels tool...", "", self.configureImageChannels),
+                    ("configure_roi_overlay_act", "ROI overlay display...", "", self.configureROIOverlay),
+                ]
+            }
         ]
     }
 
 def return_menubar(self):
-    """Return the complete menubar."""
-
     return [
         return_file_menu(self),
         return_edit_menu(self),
@@ -452,8 +471,7 @@ def return_menubar(self):
         return_section_menu(self),
         return_list_menu(self),
         return_alignments_menu(self),
-        return_tracking_menu(self),
-        ##return_autoseg_menu(self),
+        return_plugin_menu(self),
         return_view_menu(self),
         return_help_menu(self)
     ]

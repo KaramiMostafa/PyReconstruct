@@ -673,6 +673,12 @@ class Series():
             "med_dist"         : 0.1,  # MFO
             "big_dist"         : 1,  # MFO
             "autoseg"          : {},
+            "image_channel_mode"       : "auto",
+            "image_channel_single"     : 0,
+            "image_channel_overlay"    : "0,1,2",
+            "image_channel_alpha"      : 1.0,
+            "roi_overlay_mode"         : "all",
+            "roi_overlay_filter"       : "",
             
         }
 

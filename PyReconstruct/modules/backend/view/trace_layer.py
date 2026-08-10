@@ -442,6 +442,16 @@ class TraceLayer():
             painter.drawRect(x, y, h, h)
         painter.end()
 
+    def trace_matches_roi_filter(self, trace) -> bool:
+        value = self.series.getOption("roi_overlay_filter") or ""
+        tokens = [t.strip().lower() for t in value.replace(";", ",").split(",") if t.strip()]
+        if not tokens:
+            return True
+        groups = self.series.object_groups.getObjectGroups(trace.name)
+        items = [trace.name] + list(trace.tags) + list(groups)
+        items = [str(item).lower() for item in items]
+        return any(token in item for token in tokens for item in items)
+
     def trace_visibile_p(self, trace) -> bool:
         """Determine visibility of a trace in the field."""
 
@@ -465,6 +475,15 @@ class TraceLayer():
         else:  # trace hidden
 
             show_trace = False
+
+        mode = self.series.getOption("roi_overlay_mode") or "all"
+        if show_trace and mode != "all":
+            if mode == "hide all":
+                show_trace = False
+            elif mode == "only matching":
+                show_trace = self.trace_matches_roi_filter(trace)
+            elif mode == "exclude matching":
+                show_trace = not self.trace_matches_roi_filter(trace)
 
         return show_trace
         
