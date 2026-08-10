@@ -3097,11 +3097,43 @@ class MainWindow(QMainWindow):
         event.accept()
 
     def runHungarianTracking(self):
-    # Minimal proof that the menu works
         if self.series and self.series.isWelcomeSeries():
             notify("Open a real series first (not the welcome series).")
             return
-        notify("Hungarian tracking clicked. (Next: call your connector/core here.)")
+
+        # Make sure current edits are on disk before loading sections
+        self.saveAllData()
+
+        all_secs = sorted(list(self.series.sections.keys()))
+        if len(all_secs) < 2:
+            notify("Need at least 2 sections.")
+            return
+
+        structure = [
+            ["From section", ("int", all_secs[0]), "to section", ("int", all_secs[-1]), " "],
+            ["Prefix", (True, "text", "cell_")],
+        ]
+        response, confirmed = QuickDialog.get(self, structure, "Run Hungarian Tracking", spacing=10)
+        if not confirmed:
+            return
+        start_sec, end_sec, prefix = response[0], response[1], response[2]
+
+        try:
+            from pyrecon_connector import run_hungarian_tracking_on_series
+        except Exception:
+            notify("Connector not installed in this venv. Run: pip install -e PyReconstruct_connector_tracking_plugin")
+            return
+
+        try:
+            n = run_hungarian_tracking_on_series(self.series, start_sec, end_sec, prefix=prefix)
+        except Exception as e:
+            notify(f"Tracking failed:\n{e}")
+            return
+
+        self.field.reload()
+        self.field.table_manager.recreateTables()
+        self.seriesModified(True)
+        notify(f"Hungarian tracking done. Renamed {n} traces.")
 
     def runAdvancedTracking(self):
         # Minimal proof that the menu works
