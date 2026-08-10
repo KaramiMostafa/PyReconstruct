@@ -451,6 +451,14 @@ def return_plugin_menu(self):
                     ("run_unet_segmentation_act", "Pre-trained U-Net microscopy...", "", self.runUnetSegmentation),
                     ("run_cellpose_sam_segmentation_act", "Cellpose-SAM...", "", self.runCellposeSAMSegmentation),
                 ]
+            },
+            {
+                "attr_name": "channelpluginmenu",
+                "text": "Channels / overlays",
+                "opts": [
+                    ("configure_image_channels_act", "Image channel display...", "", self.configureImageChannels),
+                    ("configure_roi_overlay_act", "ROI overlay display...", "", self.configureROIOverlay),
+                ]
             }
         ]
     }

@@ -3196,18 +3196,23 @@ class MainWindow(QMainWindow):
 
         self.saveAllData()
 
+        current_channel = int(self.series.getOption("image_channel_single") or 0)
         structure = [
-            ["Checkpoint", (True, "file", "", "PyTorch checkpoints (*.pt *.pth);;All files (*)")],
+            ["Model", ("combo", ["built-in fluorescence nuclei U-Net", "custom checkpoint"], "built-in fluorescence nuclei U-Net")],
+            ["Custom checkpoint", ("file", "", "PyTorch checkpoints (*.pt *.pth);;All files (*)")],
+            ["Image channel index", ("int", current_channel)],
             ["Prefix", (True, "text", "unet_roi_")],
-            ["Threshold", ("float", 0.5)],
+            ["Foreground threshold", ("float", 0.5)],
+            ["Boundary threshold", ("float", 0.5)],
             ["Minimum ROI area in pixels", ("int", 25)],
-            ["Device", ("combo", ["auto", "cpu", "cuda"], "auto")],
+            ["Device", ("combo", ["cpu", "auto", "cuda"], "cpu")],
         ]
         response, confirmed = QuickDialog.get(self, structure, "Pre-trained U-Net Microscopy Segmentation", spacing=10)
         if not confirmed:
             return
 
-        checkpoint_path, prefix, threshold, min_area, device = response
+        model_choice, checkpoint_path, channel, prefix, threshold, boundary_threshold, min_area, device = response
+        model_source = "builtin" if model_choice.startswith("built-in") else "custom"
 
         try:
             from pyrecon_connector import run_unet_segmentation_on_section
@@ -3220,8 +3225,11 @@ class MainWindow(QMainWindow):
                 self.series,
                 self.series.current_section,
                 checkpoint_path=checkpoint_path,
+                model_source=model_source,
+                channel=channel,
                 prefix=prefix,
                 threshold=threshold,
+                boundary_threshold=boundary_threshold,
                 min_area=min_area,
                 device=device,
             )
@@ -3245,17 +3253,19 @@ class MainWindow(QMainWindow):
 
         self.saveAllData()
 
+        current_channel = int(self.series.getOption("image_channel_single") or 0)
         structure = [
+            ["Image channel index", ("int", current_channel)],
             ["Prefix", (True, "text", "cpsam_roi_")],
             ["Diameter", ("float", 0.0)],
             ["Minimum ROI area in pixels", ("int", 25)],
-            ["Use GPU", ("check", ("GPU", True))],
+            ["Use GPU", ("check", ("GPU", False))],
         ]
         response, confirmed = QuickDialog.get(self, structure, "Cellpose-SAM Segmentation", spacing=10)
         if not confirmed:
             return
 
-        prefix, diameter, min_area, gpu_choice = response
+        channel, prefix, diameter, min_area, gpu_choice = response
         use_gpu = bool(gpu_choice[0][1])
         diameter = None if diameter <= 0 else diameter
 
@@ -3273,6 +3283,7 @@ class MainWindow(QMainWindow):
                 diameter=diameter,
                 min_area=min_area,
                 gpu=use_gpu,
+                channel=channel,
             )
         except Exception as e:
             notify(f"Cellpose-SAM segmentation failed:\n{e}")
@@ -3282,6 +3293,61 @@ class MainWindow(QMainWindow):
         self.field.table_manager.recreateTables()
         self.seriesModified(True)
         notify(f"Cellpose-SAM segmentation done. Created {n} ROI traces on section {self.series.current_section}.")
+
+    def configureImageChannels(self):
+        if self.series and self.series.isWelcomeSeries():
+            notify("Open a real series first.")
+            return
+        if not self.field.section_layer.image_found:
+            notify("The current section image was not found.")
+            return
+        try:
+            from PyReconstruct.modules.backend.view.channel_utils import get_section_channel_count
+            n_channels = get_section_channel_count(self.field.section)
+        except Exception:
+            n_channels = getattr(self.field.section_layer, "channel_count", 1)
+        mode = self.series.getOption("image_channel_mode") or "auto"
+        single = int(self.series.getOption("image_channel_single") or 0)
+        overlay = self.series.getOption("image_channel_overlay") or "0,1,2"
+        alpha = float(self.series.getOption("image_channel_alpha") or 1.0)
+        structure = [
+            [f"Detected channels: {n_channels}"],
+            ["Display mode", ("combo", ["auto", "single", "overlay"], mode)],
+            ["Single channel index", ("int", single)],
+            ["Overlay channel indexes", ("text", str(overlay))],
+            ["Overlay opacity", ("float", alpha, (0.0, 1.0))],
+        ]
+        response, confirmed = QuickDialog.get(self, structure, "Image Channel Display", spacing=10)
+        if not confirmed:
+            return
+        mode, single, overlay, alpha = response
+        self.series.setOption("image_channel_mode", mode)
+        self.series.setOption("image_channel_single", max(0, int(single)))
+        self.series.setOption("image_channel_overlay", overlay)
+        self.series.setOption("image_channel_alpha", float(alpha))
+        self.field.reloadImage()
+        self.seriesModified(True)
+        notify("Image channel display updated.")
+
+    def configureROIOverlay(self):
+        if self.series and self.series.isWelcomeSeries():
+            notify("Open a real series first.")
+            return
+        mode = self.series.getOption("roi_overlay_mode") or "all"
+        filter_value = self.series.getOption("roi_overlay_filter") or ""
+        structure = [
+            ["ROI display", ("combo", ["all", "hide all", "only matching", "exclude matching"], mode)],
+            ["Groups, tags, or names", ("text", filter_value)],
+        ]
+        response, confirmed = QuickDialog.get(self, structure, "ROI Overlay Display", spacing=10)
+        if not confirmed:
+            return
+        mode, filter_value = response
+        self.series.setOption("roi_overlay_mode", mode)
+        self.series.setOption("roi_overlay_filter", filter_value)
+        self.field.generateView(generate_image=False)
+        self.seriesModified(True)
+        notify("ROI overlay display updated.")
 
 
 qdark_addon = """
