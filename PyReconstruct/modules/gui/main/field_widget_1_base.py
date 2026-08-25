@@ -484,25 +484,46 @@ class FieldWidgetBase:
         if not self.isTrackedDAPITrace(trace):
             return
         if trace in self.section.selected_traces:
+            self.clearLinkedTrackHighlightMarkers()
             self.linked_track_name = str(trace.name)
+            trace._linked_dapi_highlight = True
         elif self.linked_track_name == str(trace.name):
+            trace._linked_dapi_highlight = False
             self.linked_track_name = None
 
     def restoreLinkedTrackSelection(self) -> int:
         """Apply the native ROI selection highlight to the linked track here."""
         if not self.series.getOption("linked_dapi_highlight") or not self.linked_track_name:
             return 0
+        self.clearLinkedTrackHighlightMarkers()
         selected = 0
         for trace in visible_linked_traces(self.section.contours, self.linked_track_name):
             if trace in self.section.selected_traces:
-                continue
-            before = len(self.section.selected_traces)
-            self.section.addSelectedTrace(trace)
-            selected += len(self.section.selected_traces) - before
+                trace._linked_dapi_highlight = True
+            else:
+                before = len(self.section.selected_traces)
+                self.section.addSelectedTrace(trace)
+                added = len(self.section.selected_traces) - before
+                if added:
+                    trace._linked_dapi_highlight = True
+                    selected += added
         return selected
+
+    def clearLinkedTrackHighlightMarkers(self) -> None:
+        """Remove temporary purple-highlight markers from the current section."""
+        if self.section is None:
+            return
+        for trace in self.section.tracesAsList():
+            if getattr(trace, "_linked_dapi_highlight", False):
+                trace._linked_dapi_highlight = False
 
     def clearLinkedTrackSelection(self) -> None:
         """Stop carrying a tracked identity across section changes."""
+        self.clearLinkedTrackHighlightMarkers()
+        if self.b_section is not None:
+            for trace in self.b_section.tracesAsList():
+                if getattr(trace, "_linked_dapi_highlight", False):
+                    trace._linked_dapi_highlight = False
         self.linked_track_name = None
     
     def reloadImage(self) -> None:

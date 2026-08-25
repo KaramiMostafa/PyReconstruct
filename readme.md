@@ -24,7 +24,8 @@ Both repositories must use the `cellpose-custom-model` branch.
   models, or a local custom checkpoint.
 - Hungarian and Bayesian DAPI tracking across available sections.
 - Track-aware DAPI selection: click one tracked cell and its native selection
-  highlight follows the same cell ID while stepping through sections.
+  contour becomes purple and follows the same cell ID while stepping through
+  sections. The saved ROI color is not modified.
 - Separate DAPI, tracked-DAPI, anchor-mRNA, and mapped-mRNA ROI layers with
   optional labels.
 - Local displacement-field propagation of anchor mRNA ROIs through tracked
