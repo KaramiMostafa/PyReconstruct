@@ -32,6 +32,8 @@ Both repositories must use the `cellpose-custom-model` branch.
   DAPI nuclei.
 - Explicit expert feedback for mRNA↔DAPI associations, DAPI track links, and
   mapped mRNA ROIs.
+- A persistent DAPI review panel for collecting pairs or batches across
+  sections without closing the viewer.
 - Validation against independent expert ROIs.
 - Antibody-intensity CSVs, overlays, scatter plots, and summary reports.
 - Flexible handling of missing sections and missing image/ROI inputs.
@@ -307,15 +309,30 @@ Then repeat the appropriate OS installation section.
 4. Click a tracked DAPI ROI and move through sections to visually inspect the
    same highlighted cell ID. Configure this under **Plug-In → Tracking → Linked
    DAPI selection highlight**.
-5. Map anchor mRNA ROIs through the DAPI tracks.
-6. Review low-confidence mappings and record expert feedback carefully.
-7. Re-run tracking/mapping with saved feedback enabled.
-8. Optionally validate against independent expert ROIs and measure antibody
+5. For corrections, open **Plug-In → ⚠ Expert feedback → Open DAPI track-link
+   review panel**. Leave it open, select a tracked DAPI ROI in the main viewer,
+   add it to the panel, change sections, and add the other ROI. Two selected
+   rows create one link; an incorrect batch of more than two rows forbids every
+   selected cross-section combination.
+6. Alternatively, rename one incorrectly identified tracked-DAPI ROI with the
+   normal PyReconstruct trace editor. The rename automatically creates forced
+   links to the new neighboring identity and forbidden links to the old one.
+7. Re-run Hungarian or Bayesian tracking with **Apply saved expert feedback**
+   enabled. The completion message reports how many constraints were evaluated
+   and how many required a track change.
+8. Map anchor mRNA ROIs through the reviewed DAPI tracks.
+9. Review low-confidence mappings and record expert feedback carefully.
+10. Optionally validate against independent expert ROIs and measure antibody
    intensity.
 
 Feedback is stored beside the `.jser` in
 `<series>.multiplex_feedback.json`. A wrong correction can affect many mapped
 ROIs, so always verify both cell identities and section numbers.
+
+The in-app Bayesian tracker uses bounded single-cell candidate matching. This
+keeps its Bayesian embedding and uncertainty model while avoiding the
+unbounded higher-order belief-propagation pass that can freeze PyReconstruct on
+sections containing hundreds of ROIs.
 
 ## Development and commit messages
 

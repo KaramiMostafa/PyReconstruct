@@ -61,7 +61,8 @@ from PyReconstruct.modules.gui.dialog import (
 from PyReconstruct.modules.gui.popup import (
     TextWidget,
     CustomPlotter,
-    AboutWidget
+    AboutWidget,
+    DAPITrackingFeedbackWidget,
 )
 
 from PyReconstruct.modules.gui.utils import (

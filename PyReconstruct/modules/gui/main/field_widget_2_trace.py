@@ -903,6 +903,18 @@ class FieldWidgetTrace(FieldWidgetBase):
         name, color, tags, mode = (
             t.name, t.color, t.tags, t.fill_mode
         )
+        rename_feedback = []
+        if name is not None:
+            for trace in traces:
+                if str(trace.name) == str(name) or not self.isTrackedDAPITrace(trace):
+                    continue
+                cx, cy = trace.getCentroid()
+                rename_feedback.append({
+                    "old_name": str(trace.name),
+                    "new_name": str(name),
+                    "centroid": [float(cx), float(cy)],
+                    "groups": set(self.series.object_groups.getObjectGroups(trace.name)),
+                })
         self.section.editTraceAttributes(
             traces=traces.copy(),
             name=name,
@@ -910,6 +922,37 @@ class FieldWidgetTrace(FieldWidgetBase):
             tags=tags,
             mode=mode
         )
+
+        if rename_feedback:
+            for item in rename_feedback:
+                self.series.object_groups.add("multiplex_tracked_dapi", item["new_name"])
+                for group in item["groups"]:
+                    self.series.object_groups.add(group, item["new_name"])
+                if self.linked_track_name == item["old_name"]:
+                    self.linked_track_name = item["new_name"]
+            try:
+                from pyrecon_connector import record_dapi_rename_feedback
+                totals = {"correct": 0, "incorrect": 0}
+                for item in rename_feedback:
+                    result = record_dapi_rename_feedback(
+                        self.series,
+                        self.section.n,
+                        item["old_name"],
+                        item["new_name"],
+                        item["centroid"],
+                    )
+                    totals["correct"] += result["correct"]
+                    totals["incorrect"] += result["incorrect"]
+                notify(
+                    "Tracked-DAPI rename saved as expert feedback: "
+                    f"{totals['correct']} forced and {totals['incorrect']} forbidden "
+                    "neighbor link(s)."
+                )
+            except Exception as error:
+                notify(
+                    "The ROI was renamed, but its tracking feedback could not be saved:\n"
+                    f"{error}"
+                )
 
         return True
 

@@ -34,6 +34,7 @@ class MainWindow(QMainWindow):
         self.mouse_palette          =  None
         self.zarr_palette           =  None
         self.viewer                 =  None
+        self.dapi_feedback_widget   =  None
         self.shortcuts_widget       =  None
         self.is_zooming             =  False
         self.restart_mainwindow     =  False
@@ -492,6 +493,9 @@ class MainWindow(QMainWindow):
                 series_obj (Series): the series object (optional)
                 query_prev (bool): True if query user about saving data
         """
+
+        if self.dapi_feedback_widget is not None:
+            self.dapi_feedback_widget.close()
 
         if self.series:  # series open and save yes
             
@@ -3128,10 +3132,11 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            n = run_hungarian_tracking_on_series(
+            result = run_hungarian_tracking_on_series(
                 self.series, start_sec, end_sec, prefix=prefix,
                 source_prefix=source_prefix, source_group=source_group,
                 apply_feedback=bool(feedback_choice[0][1]),
+                return_details=True,
             )
         except Exception as e:
             notify(f"Hungarian tracking failed:\n{e}")
@@ -3140,7 +3145,17 @@ class MainWindow(QMainWindow):
         self.field.reload()
         self.field.table_manager.recreateTables()
         self.seriesModified(True)
-        notify(f"Hungarian tracking done. Renamed {n} traces.")
+        if isinstance(result, dict):
+            renamed = result.get("renamed", 0)
+            feedback_evaluated = result.get("feedback_evaluated", 0)
+            feedback_applied = result.get("feedback_applied", 0)
+        else:
+            renamed, feedback_evaluated, feedback_applied = result, 0, 0
+        notify(
+            f"Hungarian tracking done. Renamed {renamed} traces. "
+            f"Evaluated {feedback_evaluated} saved DAPI link constraint(s); "
+            f"{feedback_applied} required a track change."
+        )
 
     def runBayesianTracking(self):
         if self.series and self.series.isWelcomeSeries():
@@ -3177,7 +3192,7 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            n = run_bayesian_tracking_on_series(
+            result = run_bayesian_tracking_on_series(
                 self.series,
                 start_sec,
                 end_sec,
@@ -3188,6 +3203,7 @@ class MainWindow(QMainWindow):
                 source_prefix=source_prefix,
                 source_group=source_group,
                 apply_feedback=bool(feedback_choice[0][1]),
+                return_details=True,
             )
         except Exception as e:
             notify(f"Bayesian Transformer tracking failed:\n{e}")
@@ -3196,7 +3212,17 @@ class MainWindow(QMainWindow):
         self.field.reload()
         self.field.table_manager.recreateTables()
         self.seriesModified(True)
-        notify(f"Bayesian Transformer tracking done. Renamed {n} traces.")
+        if isinstance(result, dict):
+            renamed = result.get("renamed", 0)
+            feedback_evaluated = result.get("feedback_evaluated", 0)
+            feedback_applied = result.get("feedback_applied", 0)
+        else:
+            renamed, feedback_evaluated, feedback_applied = result, 0, 0
+        notify(
+            f"Bayesian Transformer tracking done. Renamed {renamed} traces. "
+            f"Evaluated {feedback_evaluated} saved DAPI link constraint(s); "
+            f"{feedback_applied} required a track change."
+        )
 
     def configureLinkedDAPIHighlight(self):
         if self.series and self.series.isWelcomeSeries():
@@ -3507,9 +3533,23 @@ class MainWindow(QMainWindow):
             "Check the section number, ROI type, and both cells before marking a pair or trace line. "
             "Feedback is saved in an auditable JSON sidecar and is applied only when the "
             "'Apply saved expert feedback' option is enabled.\n\n"
+            "Use the non-modal DAPI review panel to collect links across sections. "
+            "Renaming a single tracked-DAPI ROI with the trace editor also records "
+            "neighboring identity constraints automatically.\n\n"
             "This tool applies deterministic constraints; it does not safely retrain a neural "
             "network from one click."
         )
+
+    def openDAPITrackFeedbackPanel(self):
+        if self.series and self.series.isWelcomeSeries():
+            notify("Open a real series first.")
+            return
+        if self.dapi_feedback_widget is not None:
+            self.dapi_feedback_widget.show()
+            self.dapi_feedback_widget.raise_()
+            self.dapi_feedback_widget.activateWindow()
+            return
+        self.dapi_feedback_widget = DAPITrackingFeedbackWidget(self)
 
     def _feedbackAcknowledged(self, response):
         acknowledged = bool(response[-1][0][1])

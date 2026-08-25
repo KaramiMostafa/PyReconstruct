@@ -442,8 +442,8 @@ def return_plugin_menu(self):
                 "opts": [
                     ("feedback_warning_act", "⚠ Read safety warning first...", "", self.showExpertFeedbackWarning),
                     None,
+                    ("feedback_dapi_review_act", "Open DAPI track-link review panel...", "", self.openDAPITrackFeedbackPanel),
                     ("feedback_rna_dapi_act", "Mark selected mRNA ↔ DAPI pair...", "", self.recordRNADAPIFeedback),
-                    ("feedback_dapi_track_act", "Mark selected DAPI track link...", "", self.recordDAPITrackFeedback),
                     ("feedback_mapped_rna_act", "Mark selected mapped mRNA ROI...", "", self.recordMappedRNAFeedback),
                     None,
                     ("feedback_report_act", "Create separate ROI/track review report...", "", self.generateExpertFeedbackReport),
