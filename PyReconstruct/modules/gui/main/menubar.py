@@ -455,6 +455,8 @@ def return_plugin_menu(self):
                 "opts": [
                     ("run_hungarian_tracking_act", "Hungarian tracking...", "", self.runHungarianTracking),
                     ("run_bayesian_tracking_act", "Bayesian Transformer tracking...", "", self.runBayesianTracking),
+                    None,
+                    ("configure_linked_dapi_highlight_act", "Linked DAPI selection highlight...", "", self.configureLinkedDAPIHighlight),
                 ]
             },
             {

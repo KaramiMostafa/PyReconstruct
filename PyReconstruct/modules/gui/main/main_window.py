@@ -3198,6 +3198,33 @@ class MainWindow(QMainWindow):
         self.seriesModified(True)
         notify(f"Bayesian Transformer tracking done. Renamed {n} traces.")
 
+    def configureLinkedDAPIHighlight(self):
+        if self.series and self.series.isWelcomeSeries():
+            notify("Open a real series first.")
+            return
+        enabled = bool(self.series.getOption("linked_dapi_highlight"))
+        structure = [
+            ["Keep a clicked tracked DAPI cell selected while moving through sections. PyReconstruct's native selection highlight and cell ID will follow the matching ROI name."],
+            ["Track-aware selection", ("check", ("Highlight the same tracked DAPI identity on every section", enabled))],
+        ]
+        response, confirmed = QuickDialog.get(
+            self, structure, "Linked DAPI Selection Highlight", spacing=10
+        )
+        if not confirmed:
+            return
+        new_enabled = bool(response[0][0][1])
+        self.series.setOption("linked_dapi_highlight", new_enabled)
+        if not new_enabled:
+            self.field.clearLinkedTrackSelection()
+            self.field.section.deselectAllTraces()
+        elif len(self.field.section.selected_traces) == 1:
+            self.field.updateLinkedTrackSelection(self.field.section.selected_traces[0])
+        self.field.generateView(generate_image=False)
+        self.field.updateStatusBar()
+        self.seriesModified(True)
+        state = "enabled" if new_enabled else "disabled"
+        notify(f"Linked DAPI selection highlight {state}.")
+
     def runUnetSegmentation(self):
         if self.series and self.series.isWelcomeSeries():
             notify("Open a real series first.")

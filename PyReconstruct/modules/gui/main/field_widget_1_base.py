@@ -20,6 +20,8 @@ from PyReconstruct.modules.backend.view import SectionLayer, ZarrLayer
 from PyReconstruct.modules.backend.func import SeriesStates
 from PyReconstruct.modules.backend.table import TableManager
 
+from .linked_dapi import is_tracked_dapi_trace, visible_linked_traces
+
 
 class FieldWidgetBase:
     """
@@ -99,6 +101,7 @@ class FieldWidgetBase:
 
         self.selected_trace_names : set     = {}
         self.selected_ztrace_names : set    = {}
+        self.linked_track_name : str        = None
 
         self.pencil_r : QCursor             = None
         self.pencil_l : QCursor             = None
@@ -188,6 +191,7 @@ class FieldWidgetBase:
         ## Clear selected
         self.selected_trace_names = {}
         self.selected_ztrace_names = {}
+        self.linked_track_name = None
 
         ## Set up timer
         if not self.series.isWelcomeSeries():
@@ -413,6 +417,9 @@ class FieldWidgetBase:
                 self.section.selected_traces = obj_traces
             else:
                 self.section.selected_traces = []
+
+        # This also covers flickering back to the cached comparison section.
+        self.restoreLinkedTrackSelection()
         
         # create section undo/redo state object if needed
         states = self.series_states[new_section_num]
@@ -454,6 +461,7 @@ class FieldWidgetBase:
         self.section.selected_traces = []
         if self.b_section:
             self.b_section.selected_traces = []
+        self.restoreLinkedTrackSelection()
         # update the palette
         self.mainwindow.mouse_palette.updateBC()
         
@@ -461,6 +469,41 @@ class FieldWidgetBase:
 
         # notify that the series has been modified
         self.mainwindow.seriesModified(True)
+
+    def isTrackedDAPITrace(self, trace : Trace) -> bool:
+        """Return whether a trace belongs to the tracked-DAPI object group."""
+        if trace is None:
+            return False
+        return is_tracked_dapi_trace(self.series.object_groups, trace)
+
+    def updateLinkedTrackSelection(self, trace : Trace) -> None:
+        """Remember or clear the tracked identity after a normal ROI click."""
+        if not self.series.getOption("linked_dapi_highlight"):
+            self.linked_track_name = None
+            return
+        if not self.isTrackedDAPITrace(trace):
+            return
+        if trace in self.section.selected_traces:
+            self.linked_track_name = str(trace.name)
+        elif self.linked_track_name == str(trace.name):
+            self.linked_track_name = None
+
+    def restoreLinkedTrackSelection(self) -> int:
+        """Apply the native ROI selection highlight to the linked track here."""
+        if not self.series.getOption("linked_dapi_highlight") or not self.linked_track_name:
+            return 0
+        selected = 0
+        for trace in visible_linked_traces(self.section.contours, self.linked_track_name):
+            if trace in self.section.selected_traces:
+                continue
+            before = len(self.section.selected_traces)
+            self.section.addSelectedTrace(trace)
+            selected += len(self.section.selected_traces) - before
+        return selected
+
+    def clearLinkedTrackSelection(self) -> None:
+        """Stop carrying a tracked identity across section changes."""
+        self.linked_track_name = None
     
     def reloadImage(self) -> None:
         """Reload the section images (used if transform or image source is modified)."""

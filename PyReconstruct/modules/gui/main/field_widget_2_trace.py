@@ -274,6 +274,8 @@ class FieldWidgetTrace(FieldWidgetBase):
         else:  # otherwise select it
             self.section.addSelectedTrace(trace)
 
+        self.updateLinkedTrackSelection(trace)
+
         self.generateView(generate_image=False)
     
     def selectTraces(self, traces : list[Trace], ztraces_i : list):
@@ -408,6 +410,7 @@ class FieldWidgetTrace(FieldWidgetBase):
             self.generateView(generate_image=False)
         if not self.hide_trace_layer:
             self.section.deselectAllTraces()
+            self.clearLinkedTrackSelection()
             self.generateView(generate_image=False)
     
     def selectAllTraces(self):

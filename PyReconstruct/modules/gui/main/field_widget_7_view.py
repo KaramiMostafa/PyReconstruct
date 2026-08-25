@@ -20,6 +20,8 @@ from PyReconstruct.modules.backend.table import (
 from PyReconstruct.modules.gui.dialog import TraceDialog, QuickDialog
 from PyReconstruct.modules.gui.utils import notify
 
+from .linked_dapi import visible_linked_traces
+
 from .field_widget_5_mouse import (
     POINTER, 
     PANZOOM, 
@@ -101,6 +103,13 @@ class FieldWidgetView(FieldWidgetPaint):
         # display the brightness/contrast setting
         bc_profile = "B/C Profile: " + self.series.bc_profile
         self.status_list.append(bc_profile)
+
+        if self.linked_track_name:
+            present = bool(visible_linked_traces(
+                self.section.contours, self.linked_track_name
+            ))
+            suffix = "" if present else " (not visible on this section)"
+            self.status_list.append(f"Linked DAPI: {self.linked_track_name}{suffix}")
 
         # display mouse position in the field
         x, y = pixmapPointToField(

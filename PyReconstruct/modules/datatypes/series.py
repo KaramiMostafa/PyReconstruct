@@ -680,6 +680,7 @@ class Series():
             "roi_overlay_mode"         : "all",
             "roi_overlay_filter"       : "",
             "roi_overlay_labels"       : False,
+            "linked_dapi_highlight"    : True,
             
         }
 
