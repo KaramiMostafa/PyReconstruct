@@ -234,6 +234,13 @@ Open **Plug-In**. The first submenu should be
 **⚠ Expert feedback (HIGH RISK)**, followed by Tracking, Segmentation,
 Channels/overlays, and Multiplex mRNA mapping.
 
+The multiplex mapper never changes the contour of an anchor mRNA ROI. It
+copies each anchor shape and moves the complete contour with one translation
+derived from its tracked DAPI identity. Any result that would cross the target
+image boundary is skipped and reported rather than warped or clipped. Keep
+**Replace previously generated mapped ROIs** enabled when rerunning after an
+update; it replaces only generated mapped copies, not the anchor mRNA ROIs.
+
 ## Updating an existing installation
 
 macOS/Linux:

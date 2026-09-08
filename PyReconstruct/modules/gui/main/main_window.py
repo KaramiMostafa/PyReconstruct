@@ -3439,7 +3439,7 @@ class MainWindow(QMainWindow):
             notify("Open a real series first.")
             return
         structure = [
-            ["Map anchor mRNA traces through tracked DAPI identities and a local DAPI deformation field. Missing sections or traces are skipped and reported."],
+            ["Map each anchor mRNA trace by one shape-preserving DAPI translation. Anchor ROIs are never edited. Missing sections or traces are skipped and reported."],
             ["Mapping windows (anchor:targets)", (True, "text", "1:2-3;6:4-12;19:13-29;40:30-39")],
             ["Tracked DAPI name prefix (optional)", ("text", "")],
             ["Tracked DAPI object group (optional)", ("text", "multiplex_tracked_dapi")],
@@ -3450,7 +3450,7 @@ class MainWindow(QMainWindow):
             ["Local neighbor tracks", ("int", 7)],
             ["High-confidence threshold", ("float", 0.70, (0.0, 1.0))],
             ["Output folder for CSV and QC plots", (True, "dir", "")],
-            ["Existing mapped traces", ("check", ("Overwrite", False))],
+            ["Existing mapped traces", ("check", ("Replace previously generated mapped ROIs", True))],
             ["Expert constraints", ("check", ("Apply saved expert feedback", True))],
         ]
         response, confirmed = QuickDialog.get(self, structure, "Multiplex mRNA Mapping", spacing=10)
@@ -3497,7 +3497,8 @@ class MainWindow(QMainWindow):
             f"{result['high_confidence']} high confidence, {result['review']} need review.\n"
             f"Skipped: {result['skipped_unassociated']} unassociated mRNA and "
             f"{result['skipped_missing_track']} missing target tracks; "
-            f"{result.get('skipped_existing', 0)} existing mappings preserved.\n"
+            f"{result.get('skipped_existing', 0)} existing mappings preserved; "
+            f"{result.get('skipped_out_of_frame', 0)} crossed image boundaries.\n"
             f"Unavailable series sections: {missing_sections}.\n"
             f"Skipped anchor sections: {skipped_anchors}.\n"
             f"Target sections without tracked DAPI: {targets_without_dapi}.\n\n"
