@@ -77,6 +77,17 @@ class LinkedDAPIHighlightTests(unittest.TestCase):
             [dapi],
         )
 
+    def test_feedback_classification_uses_trace_tags_for_shared_name(self):
+        groups = Groups({
+            "shared_cell": {"multiplex_dapi", "multiplex_rna_anchor"},
+        })
+        dapi = Trace("shared_cell", tags={"multiplex_dapi"})
+        rna = Trace("shared_cell", tags={"multiplex_rna_anchor"})
+        self.assertTrue(linked_dapi.is_multiplex_roi(groups, dapi, "dapi"))
+        self.assertFalse(linked_dapi.is_multiplex_roi(groups, dapi, "rna"))
+        self.assertTrue(linked_dapi.is_multiplex_roi(groups, rna, "rna"))
+        self.assertFalse(linked_dapi.is_multiplex_roi(groups, rna, "dapi"))
+
     def test_multiple_tracks_receive_distinct_colors(self):
         colors = {}
         for index in range(24):

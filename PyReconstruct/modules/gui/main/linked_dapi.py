@@ -4,7 +4,9 @@ import colorsys
 
 TRACKED_DAPI_GROUP = "multiplex_tracked_dapi"
 DAPI_TRACE_TAG = "multiplex_dapi"
-RNA_TRACE_TAGS = {"multiplex_rna_anchor", "multiplex_mapped_rna"}
+ANCHOR_RNA_TRACE_TAG = "multiplex_rna_anchor"
+MAPPED_RNA_TRACE_TAG = "multiplex_mapped_rna"
+RNA_TRACE_TAGS = {ANCHOR_RNA_TRACE_TAG, MAPPED_RNA_TRACE_TAG}
 
 # The first colors are hand-picked for strong separation on microscopy images.
 # A golden-angle HSV fallback keeps the feature usable beyond this base palette.
@@ -40,6 +42,46 @@ def is_tracked_dapi_trace(object_groups, trace) -> bool:
     """Return whether a trace belongs to a tracked-DAPI identity."""
     groups = object_groups.getObjectGroups(str(trace.name))
     return TRACKED_DAPI_GROUP in groups and is_dapi_trace(trace)
+
+
+def is_multiplex_roi(object_groups, trace, kind: str) -> bool:
+    """Classify multiplex traces by trace tags before ambiguous object groups."""
+    name = str(trace.name).lower()
+    tags = {str(value).lower() for value in getattr(trace, "tags", set())}
+    groups = {
+        str(value).lower() for value in object_groups.getObjectGroups(trace.name)
+    }
+    if kind == "rna":
+        if (
+            tags & {DAPI_TRACE_TAG, MAPPED_RNA_TRACE_TAG}
+            and ANCHOR_RNA_TRACE_TAG not in tags
+        ):
+            return False
+        return (
+            ANCHOR_RNA_TRACE_TAG in tags
+            or name.startswith("rna_")
+            or ANCHOR_RNA_TRACE_TAG in groups
+        )
+    if kind == "dapi":
+        if tags & RNA_TRACE_TAGS and DAPI_TRACE_TAG not in tags:
+            return False
+        return (
+            DAPI_TRACE_TAG in tags
+            or name.startswith(("dapi_", "cell_", "bt_cell_"))
+            or bool(groups & {DAPI_TRACE_TAG, TRACKED_DAPI_GROUP})
+        )
+    if kind == "mapped":
+        if (
+            tags & {DAPI_TRACE_TAG, ANCHOR_RNA_TRACE_TAG}
+            and MAPPED_RNA_TRACE_TAG not in tags
+        ):
+            return False
+        return (
+            MAPPED_RNA_TRACE_TAG in tags
+            or name.startswith("mapped_rna_")
+            or MAPPED_RNA_TRACE_TAG in groups
+        )
+    return False
 
 
 def visible_linked_traces(contours, name: str) -> list:

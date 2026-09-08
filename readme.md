@@ -305,7 +305,8 @@ Then repeat the appropriate OS installation section.
 1. Open or create the image series.
 2. Import separate DAPI and mRNA ROI folders, or segment them with distinct
    prefixes such as `dapi_` and `rna_`.
-3. Track only DAPI ROIs.
+3. Track only DAPI ROIs. Keep **Only source object group** set to
+   `multiplex_dapi`; this prevents anchor mRNA ROIs from entering tracking.
 4. Click one or more tracked DAPI ROIs and move through sections to visually
    inspect the same highlighted cell IDs. Click an active ROI again to remove
    only that identity, or use deselect-all to clear the set. Configure this under
@@ -321,7 +322,13 @@ Then repeat the appropriate OS installation section.
 7. Re-run Hungarian or Bayesian tracking with **Apply saved expert feedback**
    enabled. The completion message reports how many constraints were evaluated
    and how many required a track change.
-8. Map anchor mRNA ROIs through the reviewed DAPI tracks.
+8. Map anchor mRNA ROIs through the reviewed DAPI tracks. Use
+   `multiplex_tracked_dapi` as the tracked-DAPI group and
+   `multiplex_rna_anchor` as the mRNA group. The default windows use anchors
+   1, 6, 19, and 40; edit the targets for shorter projects such as sections
+   1–20. A target range may include its anchor (for example `6:4-12`); the
+   mapper automatically excludes section 6 itself. Enable **Overwrite** when a
+   rerun should replace earlier mapped ROIs.
 9. Review low-confidence mappings and record expert feedback carefully.
 10. Optionally validate against independent expert ROIs and measure antibody
    intensity.

@@ -2,6 +2,7 @@
 
 
 from .main_imports import *
+from .linked_dapi import is_multiplex_roi
 
 
 class MainWindow(QMainWindow):
@@ -3115,7 +3116,7 @@ class MainWindow(QMainWindow):
         structure = [
             ["From section", ("int", all_secs[0]), "to section", ("int", all_secs[-1]), " "],
             ["Only source trace names beginning with (optional)", ("text", "")],
-            ["Only source object group (optional)", ("text", "")],
+            ["Only source object group (optional)", ("text", "multiplex_dapi")],
             ["Prefix", (True, "text", "cell_")],
             ["Expert constraints", ("check", ("Apply saved expert feedback", True))],
         ]
@@ -3172,7 +3173,7 @@ class MainWindow(QMainWindow):
         structure = [
             ["From section", ("int", all_secs[0]), "to section", ("int", all_secs[-1]), " "],
             ["Only source trace names beginning with (optional)", ("text", "")],
-            ["Only source object group (optional)", ("text", "")],
+            ["Only source object group (optional)", ("text", "multiplex_dapi")],
             ["Prefix", (True, "text", "bt_cell_")],
             ["Model checkpoint", ("file", "", "PyTorch checkpoints (*.pt *.pth);;All files (*)")],
             ["Training epochs if no checkpoint", ("int", 20)],
@@ -3439,11 +3440,11 @@ class MainWindow(QMainWindow):
             return
         structure = [
             ["Map anchor mRNA traces through tracked DAPI identities and a local DAPI deformation field. Missing sections or traces are skipped and reported."],
-            ["Mapping windows (anchor:targets)", (True, "text", "1:2-3;6:4-14;23:15-31;40:32-39")],
-            ["Tracked DAPI name prefix (optional)", ("text", "cell_")],
-            ["Tracked DAPI object group (optional)", ("text", "")],
-            ["mRNA name prefix (optional)", ("text", "rna_")],
-            ["mRNA object group (optional)", ("text", "")],
+            ["Mapping windows (anchor:targets)", (True, "text", "1:2-3;6:4-12;19:13-29;40:30-39")],
+            ["Tracked DAPI name prefix (optional)", ("text", "")],
+            ["Tracked DAPI object group (optional)", ("text", "multiplex_tracked_dapi")],
+            ["mRNA name prefix (optional)", ("text", "")],
+            ["mRNA object group (optional)", ("text", "multiplex_rna_anchor")],
             ["Mapped mRNA name prefix", (True, "text", "mapped_rna_")],
             ["Maximum mRNA-to-DAPI association distance", ("float", 15.0)],
             ["Local neighbor tracks", ("int", 7)],
@@ -3495,7 +3496,8 @@ class MainWindow(QMainWindow):
             f"mRNA mapping done. Created {result['created']} traces: "
             f"{result['high_confidence']} high confidence, {result['review']} need review.\n"
             f"Skipped: {result['skipped_unassociated']} unassociated mRNA and "
-            f"{result['skipped_missing_track']} missing target tracks.\n"
+            f"{result['skipped_missing_track']} missing target tracks; "
+            f"{result.get('skipped_existing', 0)} existing mappings preserved.\n"
             f"Unavailable series sections: {missing_sections}.\n"
             f"Skipped anchor sections: {skipped_anchors}.\n"
             f"Target sections without tracked DAPI: {targets_without_dapi}.\n\n"
@@ -3559,18 +3561,7 @@ class MainWindow(QMainWindow):
         return acknowledged
 
     def _isMultiplexROI(self, trace, kind):
-        name = str(trace.name).lower()
-        groups = {str(value).lower() for value in self.series.object_groups.getObjectGroups(trace.name)}
-        if kind == "rna":
-            return name.startswith("rna_") or "multiplex_rna_anchor" in groups
-        if kind == "dapi":
-            return (
-                name.startswith(("dapi_", "cell_", "bt_cell_"))
-                or bool(groups & {"multiplex_dapi", "multiplex_tracked_dapi"})
-            )
-        if kind == "mapped":
-            return name.startswith("mapped_rna_") or "multiplex_mapped_rna" in groups
-        return False
+        return is_multiplex_roi(self.series.object_groups, trace, kind)
 
     def recordRNADAPIFeedback(self):
         selected = list(self.field.section.selected_traces)
