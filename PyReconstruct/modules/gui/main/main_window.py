@@ -3230,8 +3230,8 @@ class MainWindow(QMainWindow):
             return
         enabled = bool(self.series.getOption("linked_dapi_highlight"))
         structure = [
-            ["Keep a clicked tracked DAPI cell selected while moving through sections. PyReconstruct's native selection highlight and cell ID will follow the matching ROI name."],
-            ["Track-aware selection", ("check", ("Highlight the same tracked DAPI identity on every section", enabled))],
+            ["Keep multiple clicked tracked DAPI cells selected while moving through sections. Each identity gets a distinct display color that follows its matching ROI name; saved ROI colors are unchanged."],
+            ["Track-aware selection", ("check", ("Highlight selected tracked DAPI identities on every section", enabled))],
         ]
         response, confirmed = QuickDialog.get(
             self, structure, "Linked DAPI Selection Highlight", spacing=10
@@ -3243,8 +3243,9 @@ class MainWindow(QMainWindow):
         if not new_enabled:
             self.field.clearLinkedTrackSelection()
             self.field.section.deselectAllTraces()
-        elif len(self.field.section.selected_traces) == 1:
-            self.field.updateLinkedTrackSelection(self.field.section.selected_traces[0])
+        else:
+            for trace in list(self.field.section.selected_traces):
+                self.field.updateLinkedTrackSelection(trace)
         self.field.generateView(generate_image=False)
         self.field.updateStatusBar()
         self.seriesModified(True)

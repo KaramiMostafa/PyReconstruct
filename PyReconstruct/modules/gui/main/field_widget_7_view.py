@@ -104,12 +104,15 @@ class FieldWidgetView(FieldWidgetPaint):
         bc_profile = "B/C Profile: " + self.series.bc_profile
         self.status_list.append(bc_profile)
 
-        if self.linked_track_name:
-            present = bool(visible_linked_traces(
-                self.section.contours, self.linked_track_name
-            ))
-            suffix = "" if present else " (not visible on this section)"
-            self.status_list.append(f"Linked DAPI: {self.linked_track_name}{suffix}")
+        if self.linked_track_colors:
+            names = list(self.linked_track_colors)
+            visible = sum(bool(visible_linked_traces(self.section.contours, name)) for name in names)
+            preview = ", ".join(names[:3])
+            if len(names) > 3:
+                preview += f", +{len(names) - 3} more"
+            self.status_list.append(
+                f"Linked DAPI ({len(names)}; {visible} visible): {preview}"
+            )
 
         # display mouse position in the field
         x, y = pixmapPointToField(

@@ -20,7 +20,11 @@ from PyReconstruct.modules.backend.view import SectionLayer, ZarrLayer
 from PyReconstruct.modules.backend.func import SeriesStates
 from PyReconstruct.modules.backend.table import TableManager
 
-from .linked_dapi import is_tracked_dapi_trace, visible_linked_traces
+from .linked_dapi import (
+    is_tracked_dapi_trace,
+    update_linked_track_colors,
+    visible_linked_traces,
+)
 
 
 class FieldWidgetBase:
@@ -101,7 +105,7 @@ class FieldWidgetBase:
 
         self.selected_trace_names : set     = {}
         self.selected_ztrace_names : set    = {}
-        self.linked_track_name : str        = None
+        self.linked_track_colors : dict     = {}
 
         self.pencil_r : QCursor             = None
         self.pencil_l : QCursor             = None
@@ -191,7 +195,7 @@ class FieldWidgetBase:
         ## Clear selected
         self.selected_trace_names = {}
         self.selected_ztrace_names = {}
-        self.linked_track_name = None
+        self.linked_track_colors = {}
 
         ## Set up timer
         if not self.series.isWelcomeSeries():
@@ -477,54 +481,50 @@ class FieldWidgetBase:
         return is_tracked_dapi_trace(self.series.object_groups, trace)
 
     def updateLinkedTrackSelection(self, trace : Trace) -> None:
-        """Remember or clear the tracked identity after a normal ROI click."""
+        """Add or remove one tracked identity after a normal ROI click."""
         if not self.series.getOption("linked_dapi_highlight"):
-            self.linked_track_name = None
+            self.clearLinkedTrackSelection()
             return
         if not self.isTrackedDAPITrace(trace):
             return
-        if trace in self.section.selected_traces:
-            self.clearLinkedTrackHighlightMarkers()
-            self.linked_track_name = str(trace.name)
-            trace._linked_dapi_highlight = True
-        elif self.linked_track_name == str(trace.name):
-            trace._linked_dapi_highlight = False
-            self.linked_track_name = None
+        color = update_linked_track_colors(
+            self.linked_track_colors,
+            trace.name,
+            trace in self.section.selected_traces,
+        )
+        trace._linked_dapi_highlight_color = color
 
     def restoreLinkedTrackSelection(self) -> int:
-        """Apply the native ROI selection highlight to the linked track here."""
-        if not self.series.getOption("linked_dapi_highlight") or not self.linked_track_name:
+        """Apply multicolor native ROI highlights to all linked tracks here."""
+        if not self.series.getOption("linked_dapi_highlight") or not self.linked_track_colors:
             return 0
         self.clearLinkedTrackHighlightMarkers()
         selected = 0
-        for trace in visible_linked_traces(self.section.contours, self.linked_track_name):
-            if trace in self.section.selected_traces:
-                trace._linked_dapi_highlight = True
-            else:
-                before = len(self.section.selected_traces)
-                self.section.addSelectedTrace(trace)
-                added = len(self.section.selected_traces) - before
-                if added:
-                    trace._linked_dapi_highlight = True
-                    selected += added
+        for name, color in self.linked_track_colors.items():
+            for trace in visible_linked_traces(self.section.contours, name):
+                trace._linked_dapi_highlight_color = color
+                if trace not in self.section.selected_traces:
+                    before = len(self.section.selected_traces)
+                    self.section.addSelectedTrace(trace)
+                    selected += len(self.section.selected_traces) - before
         return selected
 
     def clearLinkedTrackHighlightMarkers(self) -> None:
-        """Remove temporary purple-highlight markers from the current section."""
+        """Remove temporary multicolor highlight markers from this section."""
         if self.section is None:
             return
         for trace in self.section.tracesAsList():
-            if getattr(trace, "_linked_dapi_highlight", False):
-                trace._linked_dapi_highlight = False
+            if getattr(trace, "_linked_dapi_highlight_color", None) is not None:
+                trace._linked_dapi_highlight_color = None
 
     def clearLinkedTrackSelection(self) -> None:
-        """Stop carrying a tracked identity across section changes."""
+        """Stop carrying all tracked identities across section changes."""
         self.clearLinkedTrackHighlightMarkers()
         if self.b_section is not None:
             for trace in self.b_section.tracesAsList():
-                if getattr(trace, "_linked_dapi_highlight", False):
-                    trace._linked_dapi_highlight = False
-        self.linked_track_name = None
+                if getattr(trace, "_linked_dapi_highlight_color", None) is not None:
+                    trace._linked_dapi_highlight_color = None
+        self.linked_track_colors.clear()
     
     def reloadImage(self) -> None:
         """Reload the section images (used if transform or image source is modified)."""

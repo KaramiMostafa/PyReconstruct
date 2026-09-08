@@ -29,6 +29,7 @@ from PyReconstruct.modules.gui.table import (
 )
 
 from .field_widget_1_base import FieldWidgetBase
+from .linked_dapi import rename_linked_track_color
 
 class FieldWidgetTrace(FieldWidgetBase):
     """
@@ -291,6 +292,7 @@ class FieldWidgetTrace(FieldWidgetBase):
         for trace in traces:
             if trace not in self.section.selected_traces:
                 self.section.addSelectedTrace(trace)
+                self.updateLinkedTrackSelection(trace)
                 
         for ztrace_i in ztraces_i:
             if ztrace_i not in self.section.selected_ztraces:
@@ -928,8 +930,11 @@ class FieldWidgetTrace(FieldWidgetBase):
                 self.series.object_groups.add("multiplex_tracked_dapi", item["new_name"])
                 for group in item["groups"]:
                     self.series.object_groups.add(group, item["new_name"])
-                if self.linked_track_name == item["old_name"]:
-                    self.linked_track_name = item["new_name"]
+                rename_linked_track_color(
+                    self.linked_track_colors,
+                    item["old_name"],
+                    item["new_name"],
+                )
             try:
                 from pyrecon_connector import record_dapi_rename_feedback
                 totals = {"correct": 0, "incorrect": 0}

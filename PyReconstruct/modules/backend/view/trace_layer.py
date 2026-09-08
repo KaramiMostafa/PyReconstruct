@@ -34,8 +34,6 @@ from PyReconstruct.modules.calc import (
 )
 from PyReconstruct.modules.gui.utils import drawOutlinedText
 
-LINKED_DAPI_HIGHLIGHT_COLOR = (180, 70, 255)
-
 class TraceLayer():
 
     def __init__(self, section : Section, series : Series):
@@ -269,12 +267,10 @@ class TraceLayer():
             ## Draw highlight
             if trace in self.section.selected_traces:
 
-                linked_dapi = getattr(trace, "_linked_dapi_highlight", False)
-                highlight_color = (
-                    LINKED_DAPI_HIGHLIGHT_COLOR if linked_dapi else draw_color
-                )
+                linked_color = getattr(trace, "_linked_dapi_highlight_color", None)
+                highlight_color = linked_color or draw_color
                 painter.setPen(QPen(QColor(*highlight_color), 8))
-                painter.setOpacity(0.85 if linked_dapi else 0.4)
+                painter.setOpacity(0.85 if linked_color else 0.4)
 
                 if trace.closed:
                     painter.drawPolygon(qpoints)

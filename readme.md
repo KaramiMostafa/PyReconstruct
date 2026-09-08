@@ -23,9 +23,9 @@ Both repositories must use the `cellpose-custom-model` branch.
 - Cellpose-SAM segmentation using one or multiple image channels, built-in
   models, or a local custom checkpoint.
 - Hungarian and Bayesian DAPI tracking across available sections.
-- Track-aware DAPI selection: click one tracked cell and its native selection
-  contour becomes purple and follows the same cell ID while stepping through
-  sections. The saved ROI color is not modified.
+- Track-aware DAPI selection: click multiple tracked cells and each native
+  selection contour gets a distinct display color that follows the same cell ID
+  while stepping through sections. Saved ROI colors are not modified.
 - Separate DAPI, tracked-DAPI, anchor-mRNA, and mapped-mRNA ROI layers with
   optional labels.
 - Local displacement-field propagation of anchor mRNA ROIs through tracked
@@ -306,9 +306,10 @@ Then repeat the appropriate OS installation section.
 2. Import separate DAPI and mRNA ROI folders, or segment them with distinct
    prefixes such as `dapi_` and `rna_`.
 3. Track only DAPI ROIs.
-4. Click a tracked DAPI ROI and move through sections to visually inspect the
-   same highlighted cell ID. Configure this under **Plug-In → Tracking → Linked
-   DAPI selection highlight**.
+4. Click one or more tracked DAPI ROIs and move through sections to visually
+   inspect the same highlighted cell IDs. Click an active ROI again to remove
+   only that identity, or use deselect-all to clear the set. Configure this under
+   **Plug-In → Tracking → Multicolor linked DAPI selection**.
 5. For corrections, open **Plug-In → ⚠ Expert feedback → Open DAPI track-link
    review panel**. Leave it open, select a tracked DAPI ROI in the main viewer,
    add it to the panel, change sections, and add the other ROI. Two selected

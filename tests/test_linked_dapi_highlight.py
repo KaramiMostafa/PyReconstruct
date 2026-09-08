@@ -77,6 +77,32 @@ class LinkedDAPIHighlightTests(unittest.TestCase):
             [dapi],
         )
 
+    def test_multiple_tracks_receive_distinct_colors(self):
+        colors = {}
+        for index in range(24):
+            linked_dapi.update_linked_track_colors(colors, f"cell_{index}", True)
+        self.assertEqual(len(colors), 24)
+        self.assertEqual(len(set(colors.values())), 24)
+
+    def test_one_track_can_be_removed_without_clearing_others(self):
+        colors = {}
+        linked_dapi.update_linked_track_colors(colors, "cell_00168", True)
+        linked_dapi.update_linked_track_colors(colors, "cell_00177", True)
+        linked_dapi.update_linked_track_colors(colors, "cell_00168", False)
+        self.assertNotIn("cell_00168", colors)
+        self.assertIn("cell_00177", colors)
+
+    def test_renamed_track_keeps_its_color(self):
+        colors = {}
+        original = linked_dapi.update_linked_track_colors(
+            colors, "cell_00177", True
+        )
+        renamed = linked_dapi.rename_linked_track_color(
+            colors, "cell_00177", "cell_00168"
+        )
+        self.assertEqual(renamed, original)
+        self.assertEqual(colors, {"cell_00168": original})
+
 
 if __name__ == "__main__":
     unittest.main()
