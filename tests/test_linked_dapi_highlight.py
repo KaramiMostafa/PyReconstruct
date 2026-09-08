@@ -45,6 +45,13 @@ class LinkedDAPIHighlightTests(unittest.TestCase):
         rna = Trace("cell_00168", tags={"multiplex_rna_anchor"})
         self.assertFalse(linked_dapi.is_tracked_dapi_trace(groups, rna))
 
+    def test_mapped_rna_is_linkable_but_anchor_rna_is_not(self):
+        groups = Groups({})
+        mapped = Trace("mapped_rna_a001_cell", tags={"multiplex_mapped_rna"})
+        anchor = Trace("rna_anchor", tags={"multiplex_rna_anchor"})
+        self.assertTrue(linked_dapi.is_linkable_multiplex_trace(groups, mapped))
+        self.assertFalse(linked_dapi.is_linkable_multiplex_trace(groups, anchor))
+
     def test_returns_same_identity_on_next_section(self):
         target = Trace("cell_00168")
         other = Trace("cell_00177")
@@ -75,6 +82,15 @@ class LinkedDAPIHighlightTests(unittest.TestCase):
         self.assertEqual(
             linked_dapi.visible_linked_traces(contours, "cell_00168"),
             [dapi],
+        )
+
+    def test_visible_mapped_rna_is_restored_across_sections(self):
+        mapped = Trace("mapped_rna_a001_cell", tags={"multiplex_mapped_rna"})
+        anchor = Trace("mapped_rna_a001_cell", tags={"multiplex_rna_anchor"})
+        contours = {"mapped_rna_a001_cell": [mapped, anchor]}
+        self.assertEqual(
+            linked_dapi.visible_linked_traces(contours, "mapped_rna_a001_cell"),
+            [mapped],
         )
 
     def test_feedback_classification_uses_trace_tags_for_shared_name(self):
@@ -113,6 +129,21 @@ class LinkedDAPIHighlightTests(unittest.TestCase):
         )
         self.assertEqual(renamed, original)
         self.assertEqual(colors, {"cell_00168": original})
+
+    def test_mapped_feedback_updates_saved_status_color(self):
+        mapped = Trace("mapped_rna_1", tags={"multiplex_mapped_rna", "review"})
+        self.assertEqual(
+            linked_dapi.apply_mapped_feedback_style(mapped, "correct"),
+            (40, 200, 100),
+        )
+        self.assertIn("expert_approved", mapped.tags)
+        self.assertNotIn("review", mapped.tags)
+        self.assertEqual(
+            linked_dapi.apply_mapped_feedback_style(mapped, "incorrect"),
+            (230, 60, 60),
+        )
+        self.assertIn("expert_rejected", mapped.tags)
+        self.assertNotIn("expert_approved", mapped.tags)
 
 
 if __name__ == "__main__":

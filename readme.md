@@ -241,6 +241,12 @@ image boundary is skipped and reported rather than warped or clipped. Keep
 **Replace previously generated mapped ROIs** enabled when rerunning after an
 update; it replaces only generated mapped copies, not the anchor mRNA ROIs.
 
+The multicolor linked-selection option works for both tracked DAPI and mapped
+mRNA ROIs. Multiple mapped mRNA ROIs can be selected and assessed together in
+the expert-feedback command. Selection colors are temporary; saved mapping
+status remains green for accepted/high-confidence, orange for review, and red
+for expert-rejected ROIs.
+
 ## Updating an existing installation
 
 macOS/Linux:

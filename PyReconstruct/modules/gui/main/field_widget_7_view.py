@@ -111,7 +111,7 @@ class FieldWidgetView(FieldWidgetPaint):
             if len(names) > 3:
                 preview += f", +{len(names) - 3} more"
             self.status_list.append(
-                f"Linked DAPI ({len(names)}; {visible} visible): {preview}"
+                f"Linked ROIs ({len(names)}; {visible} visible): {preview}"
             )
 
         # display mouse position in the field

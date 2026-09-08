@@ -7,6 +7,14 @@ DAPI_TRACE_TAG = "multiplex_dapi"
 ANCHOR_RNA_TRACE_TAG = "multiplex_rna_anchor"
 MAPPED_RNA_TRACE_TAG = "multiplex_mapped_rna"
 RNA_TRACE_TAGS = {ANCHOR_RNA_TRACE_TAG, MAPPED_RNA_TRACE_TAG}
+MAPPING_STATUS_TAGS = {
+    "high_confidence",
+    "review",
+    "expert_approved",
+    "expert_rejected",
+    "expert_correct",
+    "expert_incorrect",
+}
 
 # The first colors are hand-picked for strong separation on microscopy images.
 # A golden-angle HSV fallback keeps the feature usable beyond this base palette.
@@ -42,6 +50,19 @@ def is_tracked_dapi_trace(object_groups, trace) -> bool:
     """Return whether a trace belongs to a tracked-DAPI identity."""
     groups = object_groups.getObjectGroups(str(trace.name))
     return TRACKED_DAPI_GROUP in groups and is_dapi_trace(trace)
+
+
+def is_mapped_rna_trace(trace) -> bool:
+    """Return whether a trace is a generated mapped-mRNA ROI."""
+    tags = {str(tag) for tag in getattr(trace, "tags", set())}
+    if tags & {DAPI_TRACE_TAG, ANCHOR_RNA_TRACE_TAG} and MAPPED_RNA_TRACE_TAG not in tags:
+        return False
+    return MAPPED_RNA_TRACE_TAG in tags or str(trace.name).startswith("mapped_rna_")
+
+
+def is_linkable_multiplex_trace(object_groups, trace) -> bool:
+    """Allow persistent multicolor selection for tracked DAPI and mapped RNA."""
+    return is_tracked_dapi_trace(object_groups, trace) or is_mapped_rna_trace(trace)
 
 
 def is_multiplex_roi(object_groups, trace, kind: str) -> bool:
@@ -85,11 +106,30 @@ def is_multiplex_roi(object_groups, trace, kind: str) -> bool:
 
 
 def visible_linked_traces(contours, name: str) -> list:
-    """Return visible traces for one linked identity on the current section."""
+    """Return visible DAPI or mapped-RNA traces for a selected identity."""
     contour = contours.get(name)
     if contour is None:
         return []
-    return [trace for trace in contour if not trace.hidden and is_dapi_trace(trace)]
+    return [
+        trace for trace in contour
+        if not trace.hidden and (is_dapi_trace(trace) or is_mapped_rna_trace(trace))
+    ]
+
+
+def apply_mapped_feedback_style(trace, verdict: str) -> tuple[int, int, int]:
+    """Apply the same saved green/red status used by a mapping rerun."""
+    verdict = str(verdict)
+    if verdict not in {"correct", "incorrect"}:
+        raise ValueError("Mapped RNA feedback must be 'correct' or 'incorrect'.")
+    trace.tags.difference_update(MAPPING_STATUS_TAGS)
+    trace.tags.update({"expert_feedback_review", f"expert_{verdict}"})
+    if verdict == "correct":
+        trace.tags.add("expert_approved")
+        trace.color = (40, 200, 100)
+    else:
+        trace.tags.add("expert_rejected")
+        trace.color = (230, 60, 60)
+    return trace.color
 
 
 def next_linked_track_color(existing_colors) -> tuple[int, int, int]:

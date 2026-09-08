@@ -21,6 +21,7 @@ from PyReconstruct.modules.backend.func import SeriesStates
 from PyReconstruct.modules.backend.table import TableManager
 
 from .linked_dapi import (
+    is_linkable_multiplex_trace,
     is_tracked_dapi_trace,
     update_linked_track_colors,
     visible_linked_traces,
@@ -481,11 +482,11 @@ class FieldWidgetBase:
         return is_tracked_dapi_trace(self.series.object_groups, trace)
 
     def updateLinkedTrackSelection(self, trace : Trace) -> None:
-        """Add or remove one tracked identity after a normal ROI click."""
+        """Add or remove one tracked-DAPI or mapped-RNA identity after a click."""
         if not self.series.getOption("linked_dapi_highlight"):
             self.clearLinkedTrackSelection()
             return
-        if not self.isTrackedDAPITrace(trace):
+        if not is_linkable_multiplex_trace(self.series.object_groups, trace):
             return
         color = update_linked_track_colors(
             self.linked_track_colors,
@@ -495,7 +496,7 @@ class FieldWidgetBase:
         trace._linked_dapi_highlight_color = color
 
     def restoreLinkedTrackSelection(self) -> int:
-        """Apply multicolor native ROI highlights to all linked tracks here."""
+        """Apply multicolor highlights to linked DAPI/mapped-RNA ROIs here."""
         if not self.series.getOption("linked_dapi_highlight") or not self.linked_track_colors:
             return 0
         self.clearLinkedTrackHighlightMarkers()

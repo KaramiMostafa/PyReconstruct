@@ -2,7 +2,7 @@
 
 
 from .main_imports import *
-from .linked_dapi import is_multiplex_roi
+from .linked_dapi import apply_mapped_feedback_style, is_multiplex_roi
 
 
 class MainWindow(QMainWindow):
@@ -3231,11 +3231,11 @@ class MainWindow(QMainWindow):
             return
         enabled = bool(self.series.getOption("linked_dapi_highlight"))
         structure = [
-            ["Keep multiple clicked tracked DAPI cells selected while moving through sections. Each identity gets a distinct display color that follows its matching ROI name; saved ROI colors are unchanged."],
-            ["Track-aware selection", ("check", ("Highlight selected tracked DAPI identities on every section", enabled))],
+            ["Keep multiple clicked tracked DAPI or mapped mRNA ROIs selected while moving through sections. Each identity gets a distinct temporary display color; saved green/orange/red mapping status colors are unchanged."],
+            ["Identity-aware selection", ("check", ("Highlight selected DAPI and mapped-mRNA identities on every section", enabled))],
         ]
         response, confirmed = QuickDialog.get(
-            self, structure, "Linked DAPI Selection Highlight", spacing=10
+            self, structure, "Linked DAPI / Mapped RNA Selection", spacing=10
         )
         if not confirmed:
             return
@@ -3251,7 +3251,7 @@ class MainWindow(QMainWindow):
         self.field.updateStatusBar()
         self.seriesModified(True)
         state = "enabled" if new_enabled else "disabled"
-        notify(f"Linked DAPI selection highlight {state}.")
+        notify(f"Linked DAPI/mapped-RNA selection highlight {state}.")
 
     def runUnetSegmentation(self):
         if self.series and self.series.isWelcomeSeries():
@@ -3662,36 +3662,54 @@ class MainWindow(QMainWindow):
 
     def recordMappedRNAFeedback(self):
         selected = list(self.field.section.selected_traces)
-        if len(selected) != 1 or not self._isMultiplexROI(selected[0], "mapped"):
-            notify("Select exactly one mapped mRNA ROI (mapped_rna_) on the current section.")
+        if not selected or any(
+            not self._isMultiplexROI(trace, "mapped") for trace in selected
+        ):
+            notify("Select one or more mapped mRNA ROIs only (mapped_rna_) on the current section.")
             return
-        mapped = selected[0]
+        preview = ", ".join(trace.name for trace in selected[:3])
+        if len(selected) > 3:
+            preview += f", +{len(selected) - 3} more"
         structure = [
-            ["⚠ HIGH RISK: approve only when this mapped mRNA ROI is on the correct cell and has plausible geometry."],
-            [f"Section {self.field.section.n}: '{mapped.name}'"],
+            ["⚠ HIGH RISK: the chosen verdict is applied to every selected mapped mRNA ROI. Approve only after checking every ROI's cell identity and geometry."],
+            [f"Section {self.field.section.n}: {len(selected)} selected ({preview})"],
             ["Mapped ROI assessment", ("combo", ["correct", "incorrect"], "incorrect")],
             ["Notes (optional)", ("text", "")],
-            ["Required", ("check", ("I checked the source identity, target cell, section, and ROI boundary", False))],
+            ["Required", ("check", ("I checked every selected ROI, source identity, target cell, section, and boundary", False))],
         ]
-        response, confirmed = QuickDialog.get(self, structure, "Expert Mapped mRNA Feedback", spacing=10)
+        response, confirmed = QuickDialog.get(
+            self, structure, "Expert Mapped mRNA Feedback", spacing=10
+        )
         if not confirmed or not self._feedbackAcknowledged(response):
             return
         verdict, notes, _ = response
         try:
-            from pyrecon_connector import add_feedback_record
-            add_feedback_record(
-                self.series, "mapped_rna", verdict, self.field.section.n, mapped, notes=notes,
+            from pyrecon_connector import add_mapped_roi_feedback_batch
+            endpoints = []
+            for mapped in selected:
+                cx, cy = mapped.getCentroid()
+                endpoints.append({
+                    "section": int(self.field.section.n),
+                    "name": str(mapped.name),
+                    "centroid": [float(cx), float(cy)],
+                })
+            add_mapped_roi_feedback_batch(
+                self.series, endpoints, verdict, notes=notes,
             )
         except Exception as e:
             notify(f"Could not save expert feedback:\n{e}")
             return
-        mapped.tags.add("expert_feedback_review")
-        mapped.tags.add(f"expert_{verdict}")
+        for mapped in selected:
+            apply_mapped_feedback_style(mapped, verdict)
+            self.series.object_groups.add("multiplex_expert_feedback", mapped.name)
         self.field.section.save(update_series_data=True)
-        self.series.object_groups.add("multiplex_expert_feedback", mapped.name)
         self.series.save()
         self.field.generateView(generate_image=False)
-        notify(f"Saved '{verdict}' feedback for mapped mRNA ROI '{mapped.name}'.")
+        notify(
+            f"Saved '{verdict}' feedback for {len(selected)} mapped mRNA ROI(s). "
+            "The saved status is green for correct or red for incorrect; temporary "
+            "multicolor selection remains active until deselected."
+        )
 
     def generateExpertFeedbackReport(self):
         if self.series and self.series.isWelcomeSeries():
