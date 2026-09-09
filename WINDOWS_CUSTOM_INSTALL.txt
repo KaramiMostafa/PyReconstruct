@@ -6,11 +6,13 @@ Important:
 - This environment creates and uses its own compatible Python 3.11.
 - Run these commands in Anaconda Prompt or a Windows Terminal where conda works.
 
-The two repositories must be beside one another like this:
+The repositories must be beside one another like this:
 
 GitHub\
   PyReconstruct\
   PyReconstruct_connector_tracking_plugin\
+  PyReconstruct_Tracking_PlugIn_Hungarian\
+  PyReconstruct_Tracking_PlugIn_BayesianTransformer\
 
 
 1. Go to the parent GitHub folder
@@ -36,6 +38,11 @@ git switch cellpose-custom-model
 git rev-parse --short HEAD
 cd ..
 
+If the tracking engines have not been cloned yet:
+
+git clone https://github.com/KaramiMostafa/PyReconstruct_Tracking_PlugIn_Hungarian.git
+git clone https://github.com/KaramiMostafa/PyReconstruct_Tracking_PlugIn_BayesianTransformer.git
+
 
 3. Create the clean Python 3.11 environment
 -------------------------------------------
@@ -50,11 +57,13 @@ python --version
 It should print Python 3.11.x.
 
 
-4. Install both local customized repositories
-----------------------------------------------
+4. Install the host, engines, and connector
+-------------------------------------------
 
 python -m pip install --upgrade pip setuptools wheel
 python -m pip install -e .\PyReconstruct
+python -m pip install -e .\PyReconstruct_Tracking_PlugIn_Hungarian
+python -m pip install -e .\PyReconstruct_Tracking_PlugIn_BayesianTransformer
 python -m pip install -e .\PyReconstruct_connector_tracking_plugin
 
 
@@ -63,9 +72,10 @@ python -m pip install -e .\PyReconstruct_connector_tracking_plugin
 
 python -c "import PyReconstruct; print(PyReconstruct.__file__)"
 python -c "import pyrecon_connector; print(pyrecon_connector.__file__)"
+python -c "import tracking_hungarian, tracking_BayesianTransformer; print('tracking engines OK')"
 
-Both paths should point inside the two cloned GitHub folders, not an unrelated
-Conda site-packages copy.
+The first two paths should point inside the cloned GitHub folders, and both
+tracking-engine imports should succeed.
 
 
 6. Start the customized program

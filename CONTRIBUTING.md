@@ -61,3 +61,11 @@ python scripts/check_conventional_commits.py --range main..HEAD
 
 Changes involving the connector should also run its test suite as described in
 the connector repository.
+
+## Plugin boundary
+
+Do not import tracking engines or other algorithm implementations into the
+PyReconstruct host. Add the public adapter to the connector, register its menu
+descriptor in `pyrecon_connector/plugin_registry.py`, and add only the required
+host dialog/view integration here. Run `tests/test_plugin_assembly.py` whenever
+the registry or a plugin handler changes. See [PLUGINS.md](PLUGINS.md).

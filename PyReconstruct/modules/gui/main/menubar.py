@@ -432,61 +432,54 @@ def return_help_menu(self):
     }
 
 def return_plugin_menu(self):
+    """Assemble the host menu from the connector-owned plugin registry."""
+    try:
+        from pyrecon_connector import get_plugin_menu_spec
+        menu_spec = get_plugin_menu_spec()
+    except Exception:
+        return {
+            "attr_name": "pluginmenu",
+            "text": "Plug-In",
+            "opts": [
+                (
+                    "plugin_connector_missing_act",
+                    "Connector unavailable—show setup instructions...",
+                    "",
+                    self.showPluginConnectorSetup,
+                ),
+            ],
+        }
+
+    groups = []
+    for registered_group in menu_spec:
+        actions = []
+        for registered_action in registered_group["actions"]:
+            if registered_action is None:
+                if actions and actions[-1] is not None:
+                    actions.append(None)
+                continue
+            handler = getattr(self, registered_action["handler"], None)
+            if handler is None:
+                continue
+            actions.append((
+                registered_action["attr_name"],
+                registered_action["text"],
+                "",
+                handler,
+            ))
+        if actions and actions[-1] is None:
+            actions.pop()
+        if not actions:
+            continue
+        groups.append({
+            "attr_name": registered_group["attr_name"],
+            "text": registered_group["text"],
+            "opts": actions,
+        })
     return {
         "attr_name": "pluginmenu",
         "text": "Plug-In",
-        "opts": [
-            {
-                "attr_name": "expertfeedbackpluginmenu",
-                "text": "⚠ Expert feedback (HIGH RISK)",
-                "opts": [
-                    ("feedback_warning_act", "⚠ Read safety warning first...", "", self.showExpertFeedbackWarning),
-                    None,
-                    ("feedback_dapi_review_act", "Open DAPI track-link review panel...", "", self.openDAPITrackFeedbackPanel),
-                    ("feedback_rna_dapi_act", "Mark selected mRNA ↔ DAPI pair...", "", self.recordRNADAPIFeedback),
-                    ("feedback_mapped_rna_act", "Mark selected mapped mRNA ROI...", "", self.recordMappedRNAFeedback),
-                    None,
-                    ("feedback_report_act", "Create separate ROI/track review report...", "", self.generateExpertFeedbackReport),
-                ]
-            },
-            {
-                "attr_name": "trackingpluginmenu",
-                "text": "Tracking",
-                "opts": [
-                    ("run_hungarian_tracking_act", "Hungarian tracking...", "", self.runHungarianTracking),
-                    ("run_bayesian_tracking_act", "Bayesian Transformer tracking...", "", self.runBayesianTracking),
-                    None,
-                    ("configure_linked_dapi_highlight_act", "Multicolor DAPI/mapped-RNA selection...", "", self.configureLinkedDAPIHighlight),
-                ]
-            },
-            {
-                "attr_name": "segmentationpluginmenu",
-                "text": "Segmentation",
-                "opts": [
-                    ("run_unet_segmentation_act", "Pre-trained U-Net microscopy...", "", self.runUnetSegmentation),
-                    ("run_cellpose_sam_segmentation_act", "Cellpose-SAM...", "", self.runCellposeSAMSegmentation),
-                ]
-            },
-            {
-                "attr_name": "channelpluginmenu",
-                "text": "Channels / overlays",
-                "opts": [
-                    ("configure_image_channels_act", "Channels tool...", "", self.configureImageChannels),
-                    ("configure_roi_overlay_act", "ROI Manager-style layers and labels...", "", self.configureROIOverlay),
-                ]
-            },
-            {
-                "attr_name": "multiplexmappingpluginmenu",
-                "text": "Multiplex mRNA mapping",
-                "opts": [
-                    ("import_multiplex_rois_act", "1. Import DAPI/mRNA ROI folders...", "", self.importMultiplexROIFolders),
-                    ("run_multiplex_mapping_act", "2. Map mRNA through DAPI tracks...", "", self.runMultiplexRNAMapping),
-                    ("review_multiplex_mapping_act", "3. Review mapped mRNA...", "", self.reviewMultiplexMappings),
-                    ("validate_multiplex_mapping_act", "4. Validate against expert ROIs...", "", self.validateMultiplexMappings),
-                    ("measure_multiplex_intensity_act", "5. Measure antibody intensity...", "", self.measureMultiplexAntibodyIntensity),
-                ]
-            }
-        ]
+        "opts": groups,
     }
 
 def return_menubar(self):

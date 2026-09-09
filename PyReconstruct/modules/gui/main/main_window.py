@@ -3101,6 +3101,13 @@ class MainWindow(QMainWindow):
             self.viewer.close()
         event.accept()
 
+    def showPluginConnectorSetup(self):
+        notify(
+            "The PyReconstruct connector is not installed in this environment.\n\n"
+            "Install the algorithm cores and connector from their sibling repositories, then "
+            "restart PyReconstruct. See PLUGINS.md and readme.md in the customized repository."
+        )
+
     def runHungarianTracking(self):
         if self.series and self.series.isWelcomeSeries():
             notify("Open a real series first.")

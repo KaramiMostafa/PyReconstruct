@@ -7,16 +7,19 @@ This branch extends [PyReconstruct](https://github.com/SynapseWeb/PyReconstruct)
 with microscopy plug-ins for segmentation, DAPI tracking, mRNA ROI mapping,
 expert review, and antibody-intensity analysis.
 
-The customized application uses two repositories. They must be cloned beside
-one another:
+The complete tracking installation uses four sibling repositories:
 
 ```text
 GitHub/
 ├── PyReconstruct/
-└── PyReconstruct_connector_tracking_plugin/
+├── PyReconstruct_connector_tracking_plugin/
+├── PyReconstruct_Tracking_PlugIn_Hungarian/
+└── PyReconstruct_Tracking_PlugIn_BayesianTransformer/
 ```
 
-Both repositories must use the `cellpose-custom-model` branch.
+PyReconstruct and the connector use `cellpose-custom-model`; the two independent
+tracking engines use `main`. See [PLUGINS.md](PLUGINS.md) for the assembly
+contract and authoritative plugin list.
 
 ## Customized features
 
@@ -28,8 +31,7 @@ Both repositories must use the `cellpose-custom-model` branch.
   while stepping through sections. Saved ROI colors are not modified.
 - Separate DAPI, tracked-DAPI, anchor-mRNA, and mapped-mRNA ROI layers with
   optional labels.
-- Local displacement-field propagation of anchor mRNA ROIs through tracked
-  DAPI nuclei.
+- Shape-preserving translation of anchor mRNA ROIs through tracked DAPI nuclei.
 - Explicit expert feedback for mRNA↔DAPI associations, DAPI track links, and
   mapped mRNA ROIs.
 - A persistent DAPI review panel for collecting pairs or batches across
@@ -47,7 +49,7 @@ Both repositories must use the `cellpose-custom-model` branch.
 | Git | Recent Git with command-line access |
 | RAM | 8 GB minimum; 16 GB or more recommended for Cellpose |
 | Disk | Allow several GB for PyTorch, Qt, VTK, and model files |
-| Repositories | Both customized repositories on the same branch |
+| Repositories | Host, connector, and any installed algorithm-engine repositories |
 
 GPU acceleration is optional. CPU mode is slower but is the easiest first
 installation to verify. Install and test CPU mode before adding CUDA.
@@ -80,6 +82,8 @@ cd ~/GitHub/pyreconstruct-custom
 
 git clone --branch cellpose-custom-model https://github.com/KaramiMostafa/PyReconstruct.git
 git clone --branch cellpose-custom-model https://github.com/KaramiMostafa/PyReconstruct_connector_tracking_plugin.git
+git clone https://github.com/KaramiMostafa/PyReconstruct_Tracking_PlugIn_Hungarian.git
+git clone https://github.com/KaramiMostafa/PyReconstruct_Tracking_PlugIn_BayesianTransformer.git
 
 conda create -n pyreconstruct-custom python=3.11 pip setuptools wheel -y
 conda activate pyreconstruct-custom
@@ -98,10 +102,12 @@ Intel Mac:
 python -m pip install "torch==2.2.2" "torchvision==0.17.2"
 ```
 
-Install both repositories:
+Install the host, tracking engines, and connector:
 
 ```bash
 python -m pip install -e ./PyReconstruct
+python -m pip install -e ./PyReconstruct_Tracking_PlugIn_Hungarian
+python -m pip install -e ./PyReconstruct_Tracking_PlugIn_BayesianTransformer
 python -m pip install -e ./PyReconstruct_connector_tracking_plugin
 ```
 
@@ -128,6 +134,8 @@ cd ~/GitHub/pyreconstruct-custom
 
 git clone --branch cellpose-custom-model https://github.com/KaramiMostafa/PyReconstruct.git
 git clone --branch cellpose-custom-model https://github.com/KaramiMostafa/PyReconstruct_connector_tracking_plugin.git
+git clone https://github.com/KaramiMostafa/PyReconstruct_Tracking_PlugIn_Hungarian.git
+git clone https://github.com/KaramiMostafa/PyReconstruct_Tracking_PlugIn_BayesianTransformer.git
 
 conda create -n pyreconstruct-custom python=3.11 pip setuptools wheel -y
 conda activate pyreconstruct-custom
@@ -141,10 +149,12 @@ python -m pip install --index-url https://download.pytorch.org/whl/cpu \
   "torch==2.5.1" "torchvision==0.20.1"
 ```
 
-Then install the application and connector:
+Then install the application, tracking engines, and connector:
 
 ```bash
 python -m pip install -e ./PyReconstruct
+python -m pip install -e ./PyReconstruct_Tracking_PlugIn_Hungarian
+python -m pip install -e ./PyReconstruct_Tracking_PlugIn_BayesianTransformer
 python -m pip install -e ./PyReconstruct_connector_tracking_plugin
 ```
 
@@ -172,6 +182,8 @@ cd GitHub
 
 git clone --branch cellpose-custom-model https://github.com/KaramiMostafa/PyReconstruct.git
 git clone --branch cellpose-custom-model https://github.com/KaramiMostafa/PyReconstruct_connector_tracking_plugin.git
+git clone https://github.com/KaramiMostafa/PyReconstruct_Tracking_PlugIn_Hungarian.git
+git clone https://github.com/KaramiMostafa/PyReconstruct_Tracking_PlugIn_BayesianTransformer.git
 
 conda create -n pyreconstruct-custom python=3.11 pip setuptools wheel -y
 conda activate pyreconstruct-custom
@@ -185,10 +197,12 @@ python -m pip install --index-url https://download.pytorch.org/whl/cpu `
   "torch==2.5.1" "torchvision==0.20.1"
 ```
 
-Install both customized repositories from their parent folder:
+Install the host, tracking engines, and connector from their parent folder:
 
 ```powershell
 python -m pip install -e .\PyReconstruct
+python -m pip install -e .\PyReconstruct_Tracking_PlugIn_Hungarian
+python -m pip install -e .\PyReconstruct_Tracking_PlugIn_BayesianTransformer
 python -m pip install -e .\PyReconstruct_connector_tracking_plugin
 ```
 
@@ -207,13 +221,15 @@ Run these checks while `pyreconstruct-custom` is activated:
 python --version
 python -c "import PyReconstruct; print(PyReconstruct.__file__)"
 python -c "import pyrecon_connector; print(pyrecon_connector.__file__)"
+python -c "import tracking_hungarian, tracking_BayesianTransformer; print('tracking engines OK')"
 python -c "import torch, torchvision, cellpose; print(torch.__version__, torchvision.__version__)"
 ```
 
 Expected results:
 
 - Python reports `3.11.x`.
-- The first two paths point into the two cloned repositories.
+- The PyReconstruct and connector paths point into their cloned repositories;
+  both tracking-engine imports succeed.
 - PyTorch, torchvision, and Cellpose import without errors.
 
 ## Launch
@@ -257,7 +273,11 @@ git -C PyReconstruct switch cellpose-custom-model
 git -C PyReconstruct pull --ff-only origin cellpose-custom-model
 git -C PyReconstruct_connector_tracking_plugin switch cellpose-custom-model
 git -C PyReconstruct_connector_tracking_plugin pull --ff-only origin cellpose-custom-model
+git -C PyReconstruct_Tracking_PlugIn_Hungarian pull --ff-only origin main
+git -C PyReconstruct_Tracking_PlugIn_BayesianTransformer pull --ff-only origin main
 python -m pip install -e ./PyReconstruct
+python -m pip install -e ./PyReconstruct_Tracking_PlugIn_Hungarian
+python -m pip install -e ./PyReconstruct_Tracking_PlugIn_BayesianTransformer
 python -m pip install -e ./PyReconstruct_connector_tracking_plugin
 ```
 
@@ -323,7 +343,7 @@ Then repeat the appropriate OS installation section.
 4. Click one or more tracked DAPI ROIs and move through sections to visually
    inspect the same highlighted cell IDs. Click an active ROI again to remove
    only that identity, or use deselect-all to clear the set. Configure this under
-   **Plug-In → Tracking → Multicolor linked DAPI selection**.
+   **Plug-In → Tracking → Multicolor DAPI/mapped-RNA selection**.
 5. For corrections, open **Plug-In → ⚠ Expert feedback → Open DAPI track-link
    review panel**. Leave it open, select a tracked DAPI ROI in the main viewer,
    add it to the panel, change sections, and add the other ROI. Two selected
@@ -340,8 +360,8 @@ Then repeat the appropriate OS installation section.
    `multiplex_rna_anchor` as the mRNA group. The default windows use anchors
    1, 6, 19, and 40; edit the targets for shorter projects such as sections
    1–20. A target range may include its anchor (for example `6:4-12`); the
-   mapper automatically excludes section 6 itself. Enable **Overwrite** when a
-   rerun should replace earlier mapped ROIs.
+   mapper automatically excludes section 6 itself. Keep **Replace previously
+   generated mapped ROIs** enabled when a rerun should replace earlier maps.
 9. Review low-confidence mappings and record expert feedback carefully.
 10. Optionally validate against independent expert ROIs and measure antibody
    intensity.

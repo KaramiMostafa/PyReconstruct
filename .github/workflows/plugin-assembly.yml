@@ -1,0 +1,29 @@
+name: Plugin assembly
+
+on:
+  pull_request:
+  push:
+    branches:
+      - cellpose-custom-model
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out customized host
+        uses: actions/checkout@v4
+        with:
+          path: host
+      - name: Check out connector registry
+        uses: actions/checkout@v4
+        with:
+          repository: KaramiMostafa/PyReconstruct_connector_tracking_plugin
+          ref: cellpose-custom-model
+          path: connector
+      - name: Validate registered host handlers
+        env:
+          PYTHONPATH: ${{ github.workspace }}/connector
+        run: python host/tests/test_plugin_assembly.py
