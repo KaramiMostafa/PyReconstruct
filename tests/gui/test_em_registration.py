@@ -41,6 +41,7 @@ class EMRegistrationDialogTests(unittest.TestCase):
             "a,3,3,3,3\nb,25,3,25,3\nc,3,25,3,25\n", encoding="utf-8",
         )
         self.dialog = EMRegistrationDialog()
+        self.dialog.mode.setCurrentIndex(1)  # Keep exercising legacy pair mode.
         for key, name in (("fixed_image", "fixed.tif"), ("moving_image", "moving.tif"),
                           ("landmarks_csv", "points.csv")):
             self.dialog.fields[key].le.setText(str(self.root / name))
@@ -80,6 +81,26 @@ class EMRegistrationDialogTests(unittest.TestCase):
         self.assertIsNone(self.dialog.result)
         self.assertTrue(self.dialog.run_button.isEnabled())
         self.assertFalse(self.dialog.open_button.isEnabled())
+
+    def test_serial_mode_registers_whole_stack(self):
+        folder = self.root / "serial"
+        folder.mkdir()
+        rows = ["point,slice,x,y"]
+        for section in (1, 2, 3):
+            imwrite(folder / f"section.{section}.tif", np.arange(1024, dtype=np.uint16).reshape(32, 32))
+            rows.extend(f"{name},{section},{x},{y}" for name, x, y in
+                        (("a", 3, 3), ("b", 25, 3), ("c", 3, 25)))
+        (self.root / "serial.csv").write_text("\n".join(rows))
+        self.dialog.mode.setCurrentIndex(0)
+        self.dialog.fields["image_series"].le.setText(str(folder))
+        self.dialog.fields["landmarks_csv"].le.setText(str(self.root / "serial.csv"))
+        self.assertNotIn("fixed_image", self.dialog.options())
+        QTest.mouseClick(self.dialog.run_button, Qt.LeftButton)
+        self.wait_for_worker()
+        self.assertIsNotNone(self.dialog.result, self.dialog.status.text())
+        self.assertEqual(self.dialog.result["report"]["section_order"], [1, 2, 3])
+        self.assertIn("Saved 3 sections", self.dialog.status.text())
+        self.assertFalse(self.dialog.preview.pixmap().isNull())
 
     def test_close_requests_cancellation_and_waits_for_worker(self):
         def wait_for_cancel(**options):

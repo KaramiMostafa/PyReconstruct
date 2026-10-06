@@ -23,8 +23,9 @@ contract and authoritative plugin list.
 
 ## Customized features
 
-- Landmark-based EM registration for two image/mask pairs, with TPS warping,
-  label-preserving mask resampling, and before/after review exports.
+- Serial-section landmark registration with chained TPS/affine transforms,
+  propagated landmarks, and complete-stack exports in the first section's frame.
+  Optional single-pair mode includes label-preserving mask resampling.
 - Cellpose-SAM segmentation using one or multiple image channels, built-in
   models, or a local custom checkpoint.
 - Hungarian and Bayesian DAPI tracking across available sections.
@@ -44,8 +45,12 @@ contract and authoritative plugin list.
 
 ## EM registration
 
-For the EM workflow, open **Plug-In → Registration → EM images + masks + landmarks…**.
-Select fixed/moving TIFFs and masks, the coordinate CSV, and slice numbers.
+For the EM workflow, open **Plug-In → Registration → Serial sections / EM landmarks…**.
+In serial mode, choose the numbered TIFF folder, the coordinate CSV, and an
+output parent folder. Each section uses the preceding section's transformed
+landmarks; all output images share the first section's canvas. TPS is the
+default, with affine registration also available. The same dialog retains
+single-pair mode with optional masks.
 The original `point,slice,X,Y` table (including an unnamed point column) is
 supported. Review the output and import its `images/` folder as a new series.
 See the [registration guide](https://github.com/KaramiMostafa/PyReconstruct_connector_tracking_plugin/blob/cellpose-custom-model/REGISTRATION.md)

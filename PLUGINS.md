@@ -29,7 +29,7 @@ results back to the open series.
 
 | Capability | Implementation | External engine |
 |---|---|---|
-| EM image/mask registration | Connector TPS file adapter and independent numerical module | SciPy |
+| Serial-section / EM registration | Connector chained TPS/affine registration, paired image/mask adapter, and independent numerical module | SciPy |
 | Hungarian DAPI tracking | Connector adapter | `tracking_hungarian` repository |
 | Bayesian DAPI tracking | Connector adapter | `tracking_BayesianTransformer` repository |
 | U-Net segmentation | Connector-native adapter | PyTorch |
