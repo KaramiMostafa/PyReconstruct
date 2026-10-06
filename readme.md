@@ -45,17 +45,84 @@ contract and authoritative plugin list.
 
 ## EM registration
 
-For the EM workflow, open **Plug-In → Registration → Serial sections / EM landmarks…**.
-In serial mode, choose the numbered TIFF folder, the coordinate CSV, and an
-output parent folder. Each section uses the preceding section's transformed
-landmarks; all output images share the first section's canvas. TPS is the
-default, with affine registration also available. The same dialog retains
-single-pair mode with optional masks.
-The original `point,slice,X,Y` table (including an unnamed point column) is
-supported. Review the output and import its `images/` folder as a new series.
-See the [registration guide](https://github.com/KaramiMostafa/PyReconstruct_connector_tracking_plugin/blob/cellpose-custom-model/REGISTRATION.md)
-for coordinate conventions and mask handling. Existing installations need only
-update the host and connector; registration uses the existing SciPy stack.
+This plugin registers EM sections from corresponding landmarks. It supports a
+complete serial stack (TPS or affine) and a single image pair (TPS, with optional
+label masks). Update **both** the host and connector on `cellpose-custom-model`
+and restart PyReconstruct to see the current menu. Registration uses the existing
+SciPy stack and does not require a GPU or a model checkpoint.
+
+### Test with the Mostafa dataset
+
+The example assumes the collaborator-provided `Mostafa` folder is available
+beside your repository clones; the microscopy data are not included in this
+repository.
+
+Activate the environment used to install PyReconstruct (`synapses` in the
+existing Mostafa setup), then run this from the **PyReconstruct repository root**:
+
+```bash
+python PyReconstruct/run.py
+```
+
+Open **Plug-In → Registration → Serial sections / EM landmarks…** and use:
+
+| Setting | Value for the ten-section example |
+|---|---|
+| Registration mode | **Serial section stack (chained registration)** |
+| Serial TIFF images folder | `Mostafa/EM_10` |
+| Landmark coordinates CSV | `Mostafa/EM_10/correspondence points underwood 1 to 10.csv` |
+| Output parent folder | `Mostafa` (or another existing folder) |
+| Serial transformation | **Thin-plate spline (TPS)**; **Affine** is also available |
+| Coordinate origin | **Top-left** |
+| Coordinate indexing | **Zero-based** |
+
+Click **Run registration**, then **Open results folder**. Images are ordered by
+their trailing slice numbers, so `_underwood.10.tif` follows section 9. Section 1
+is the unchanged reference. Section 2 is registered using section 1's landmarks;
+section 3 uses section 2's **registered** landmarks, and so on. Each original
+image is resampled once onto the first section's canvas. All current landmarks,
+including IDs not shared with the preceding section, are propagated onward.
+
+### Inputs and optional pair mode
+
+Use single-plane, 2D grayscale TIFFs and a CSV with `point,slice,X,Y` columns.
+The supplied CSV's unnamed point column is accepted. Landmark IDs establish
+correspondence; row order does not matter. Each adjacent pair needs at least
+three distinct, non-collinear shared points. In serial mode, every image must
+have landmarks and every CSV slice must have a corresponding image.
+
+Coordinates must be **raw image pixels**, with X = column and Y = row. Use the
+origin/indexing options if your data are bottom-left or one-based; do not enter
+PyReconstruct's aligned micrometre coordinates directly.
+
+For just two images, choose **Single fixed/moving pair (optional masks)**.
+With the same CSV, select `_underwood.1.tif` as fixed, `_underwood.2.tif` as moving,
+and slice numbers **1 / 2**. Leave both mask fields blank for this dataset, which
+has no separate masks. For other data, supply both masks at their respective
+image sizes, with integer labels and 0 as background. Masks are warped by the
+landmark transform using nearest-neighbor sampling to preserve label IDs.
+Mask inputs are available only in pair mode.
+
+### Results and review
+
+Serial runs create a new `serial_registration_…/` folder containing `images/`,
+`previews/`, `coverage/`, `registered_landmarks.csv`, and `registration.json`.
+Pair runs create `em_registration_…/` with `images/`, optional `masks/`,
+`preview.png`, `coverage.tif`, `landmark_residuals.csv`, and `registration.json`.
+
+Review the previews and full-resolution images. Fixed/reference is magenta and
+moving/registered is green in the overlays. Then select **File → New → From
+images…** and choose the TIFFs inside the new `images/` folder, using the
+reference image's pixel size for calibration.
+
+TPS can deform image and mask contours; serial registration may accumulate
+drift. Small errors at the fitting landmarks do not establish accuracy elsewhere.
+The plugin exports a new dataset and does not apply the nonlinear warp to an
+existing project's affine alignment or vector ROIs. Source files and earlier
+runs remain unchanged; cancellation or failure does not publish a partial run.
+
+See the [full registration guide](https://github.com/KaramiMostafa/PyReconstruct_connector_tracking_plugin/blob/cellpose-custom-model/REGISTRATION.md)
+for CSV examples, output definitions, and the Python API.
 
 ## Requirements for every operating system
 
