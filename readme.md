@@ -4,7 +4,7 @@
 # Customized PyReconstruct
 
 This branch extends [PyReconstruct](https://github.com/SynapseWeb/PyReconstruct)
-with microscopy plug-ins for segmentation, DAPI tracking, mRNA ROI mapping,
+with microscopy plug-ins for EM registration, segmentation, DAPI tracking, mRNA ROI mapping,
 expert review, and antibody-intensity analysis.
 
 The complete tracking installation uses four sibling repositories:
@@ -23,6 +23,8 @@ contract and authoritative plugin list.
 
 ## Customized features
 
+- Landmark-based EM registration for two image/mask pairs, with TPS warping,
+  label-preserving mask resampling, and before/after review exports.
 - Cellpose-SAM segmentation using one or multiple image channels, built-in
   models, or a local custom checkpoint.
 - Hungarian and Bayesian DAPI tracking across available sections.
@@ -39,6 +41,16 @@ contract and authoritative plugin list.
 - Validation against independent expert ROIs.
 - Antibody-intensity CSVs, overlays, scatter plots, and summary reports.
 - Flexible handling of missing sections and missing image/ROI inputs.
+
+## EM registration
+
+For the EM workflow, open **Plug-In → Registration → EM images + masks + landmarks…**.
+Select fixed/moving TIFFs and masks, the coordinate CSV, and slice numbers.
+The original `point,slice,X,Y` table (including an unnamed point column) is
+supported. Review the output and import its `images/` folder as a new series.
+See the [registration guide](https://github.com/KaramiMostafa/PyReconstruct_connector_tracking_plugin/blob/cellpose-custom-model/REGISTRATION.md)
+for coordinate conventions and mask handling. Existing installations need only
+update the host and connector; registration uses the existing SciPy stack.
 
 ## Requirements for every operating system
 

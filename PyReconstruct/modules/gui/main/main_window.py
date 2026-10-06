@@ -3108,6 +3108,10 @@ class MainWindow(QMainWindow):
             "restart PyReconstruct. See PLUGINS.md and readme.md in the customized repository."
         )
 
+    def runEMRegistration(self):
+        from PyReconstruct.modules.gui.dialog.em_registration import EMRegistrationDialog
+        EMRegistrationDialog(self).exec()
+
     def runHungarianTracking(self):
         if self.series and self.series.isWelcomeSeries():
             notify("Open a real series first.")
