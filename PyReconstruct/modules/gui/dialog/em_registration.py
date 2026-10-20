@@ -5,7 +5,7 @@ from pathlib import Path
 from PySide6.QtCore import QThread, Qt, Signal, QUrl
 from PySide6.QtGui import QDesktopServices, QPixmap
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QFormLayout, QHBoxLayout, QLabel, QProgressBar,
+    QApplication, QComboBox, QDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QProgressBar,
     QPushButton, QScrollArea, QSpinBox, QVBoxLayout, QWidget,
 )
 
@@ -35,12 +35,14 @@ class RegistrationWorker(QThread):
 
 
 class EMRegistrationDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, series=None):
         super().__init__(parent)
         self.setWindowTitle("Registration — serial sections and landmarks")
         self.resize(850, 780)
         self.worker = None
         self.result = None
+        self.series = series
+        self.completion_message = None
         self.close_when_finished = False
         layout = QVBoxLayout(self)
         explanation = QLabel(
@@ -89,6 +91,16 @@ class EMRegistrationDialog(QDialog):
         self.pixel_base.addItem("One-based: first pixel is 1", 1)
         form.addRow("Coordinate origin", self.origin)
         form.addRow("Coordinate indexing", self.pixel_base)
+        self.landmark_button = QPushButton("Create/edit pixel landmarks…")
+        self.landmark_button.clicked.connect(self.open_landmark_editor)
+        form.addRow("Landmark window", self.landmark_button)
+        coordinate_note = QLabel(
+            "Project measurements use micrometres (µm). Registration uses raw TIFF pixels. "
+            "Create landmarks in the separate pixel window, or use its 'Use project landmarks' "
+            "button to convert named trace centres. A normal project CSV is not a pixel CSV."
+        )
+        coordinate_note.setWordWrap(True)
+        form.addRow(coordinate_note)
         help_text = QLabel(
             "Serial mode: numbered TIFF filenames (e.g. _underwood.1.tif), ordered "
             "numerically, and CSV point,slice,X,Y (unnamed point column accepted). "
@@ -142,6 +154,53 @@ class EMRegistrationDialog(QDialog):
             widget.setVisible(visible)
             self.form.labelForField(widget).setVisible(visible)
 
+    def landmark_images(self):
+        from pyrecon_connector import get_registration_images
+        if self.mode.currentData() == "serial":
+            folder = self.fields["image_series"].text().strip()
+            if not folder:
+                raise ValueError("Choose the serial TIFF images folder first.")
+            return get_registration_images(folder)
+        fixed, moving = self.fixed_section.value(), self.moving_section.value()
+        if fixed == moving:
+            raise ValueError("Fixed and moving slice numbers must be different.")
+        return get_registration_images({
+            fixed: self.fields["fixed_image"].text().strip(),
+            moving: self.fields["moving_image"].text().strip(),
+        })
+
+    def open_landmark_editor(self):
+        from .registration_landmarks import RegistrationLandmarkDialog
+        try:
+            images = self.landmark_images()
+            pair_sections = ((self.fixed_section.value(), self.moving_section.value())
+                             if self.mode.currentData() == "pair" else None)
+            editor = RegistrationLandmarkDialog(
+                images, self, series=self.series, pair_sections=pair_sections,
+            )
+        except Exception as exc:
+            self.status.setText(str(exc))
+            return
+        path = self.fields["landmarks_csv"].text().strip()
+        if path:
+            from pyrecon_connector import load_registration_landmarks
+            try:
+                editor.replace_points(load_registration_landmarks(
+                    path, images, coordinate_origin=self.origin.currentData(),
+                    coordinate_base=self.pixel_base.currentData(), pair_sections=pair_sections,
+                ))
+                editor.dirty = False
+            except Exception as exc:
+                editor.status.setText(f"CSV was not loaded: {exc} You can place new pixel landmarks here.")
+        editor.csv_saved.connect(self.use_pixel_csv)
+        editor.exec()
+
+    def use_pixel_csv(self, path):
+        self.fields["landmarks_csv"].le.setText(path)
+        self.origin.setCurrentIndex(self.origin.findData("top-left"))
+        self.pixel_base.setCurrentIndex(self.pixel_base.findData(0))
+        self.status.setText("Pixel landmark CSV selected: top-left, zero-based. Ready to run registration.")
+
     def options(self):
         options = {key: widget.text().strip() for key, widget in self.fields.items()}
         if self.mode.currentData() == "serial":
@@ -177,6 +236,9 @@ class EMRegistrationDialog(QDialog):
         except ValueError as exc:
             self.status.setText(str(exc))
             return
+        if self.completion_message is not None:
+            self.completion_message.close()
+            self.completion_message = None
         self.result = None
         self.preview.clear()
         self.open_button.setEnabled(False)
@@ -233,6 +295,32 @@ class EMRegistrationDialog(QDialog):
         self.close_button.setText("Close")
         if self.close_when_finished:
             super().reject()
+        elif self.result is not None:
+            self.show_completion()
+
+    def show_completion(self):
+        images_folder = str(Path(self.result["output_dir"]) / "images")
+        message = QMessageBox(self)
+        message.setWindowTitle("Registration complete")
+        message.setIcon(QMessageBox.Information)
+        message.setText("Registration is done. Your registered images are saved here:")
+        message.setInformativeText(
+            f"{images_folder}\n\n"
+            "Review the previews in the results folder. Then use File → New → From images… "
+            "and select the TIFFs in the images folder above. Use the reference image's "
+            "pixel size for calibration. Your current project has not been replaced."
+        )
+        message.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        open_button = message.addButton("Open images folder", QMessageBox.ActionRole)
+        copy_button = message.addButton("Copy images path", QMessageBox.ActionRole)
+        message.addButton(QMessageBox.Ok)
+        message.buttonClicked.connect(
+            lambda button: QDesktopServices.openUrl(QUrl.fromLocalFile(images_folder))
+            if button == open_button else
+            QApplication.clipboard().setText(images_folder) if button == copy_button else None
+        )
+        self.completion_message = message
+        message.open()
 
     def reject(self):
         if self.worker is not None:

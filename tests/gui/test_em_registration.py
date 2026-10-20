@@ -53,6 +53,8 @@ class EMRegistrationDialogTests(unittest.TestCase):
         if self.dialog.worker is not None:
             self.dialog.worker.requestInterruption()
             self.wait_for_worker()
+        if self.dialog.completion_message is not None:
+            self.dialog.completion_message.close()
         self.dialog.close()
         self.app.processEvents()
 
@@ -72,6 +74,27 @@ class EMRegistrationDialogTests(unittest.TestCase):
         self.assertTrue(self.dialog.open_button.isEnabled())
         self.assertFalse(self.dialog.preview.pixmap().isNull())
         self.assertTrue(Path(self.dialog.result["files"]["registered_image"]).is_file())
+        self.assertIsNotNone(self.dialog.completion_message)
+        self.assertIn(str(Path(self.dialog.result["output_dir"]) / "images"),
+                      self.dialog.completion_message.informativeText())
+        self.assertIn("Registration is done", self.dialog.completion_message.text())
+        copy_button = next(button for button in self.dialog.completion_message.buttons()
+                           if button.text() == "Copy images path")
+        QTest.mouseClick(copy_button, Qt.LeftButton)
+        self.assertEqual(
+            self.app.clipboard().text(), str(Path(self.dialog.result["output_dir"]) / "images"),
+        )
+
+    def test_failed_rerun_does_not_show_previous_success(self):
+        self.dialog.start_registration()
+        self.wait_for_worker()
+        self.assertIsNotNone(self.dialog.completion_message)
+        with patch("pyrecon_connector.run_em_registration", side_effect=ValueError("Bad landmarks")):
+            self.dialog.start_registration()
+            self.wait_for_worker()
+        self.assertIsNone(self.dialog.completion_message)
+        self.assertIsNone(self.dialog.result)
+        self.assertEqual(self.dialog.status.text(), "Bad landmarks")
 
     def test_worker_error_is_displayed_without_closing_dialog(self):
         with patch("pyrecon_connector.run_em_registration", side_effect=ValueError("Bad landmarks")):
@@ -81,6 +104,15 @@ class EMRegistrationDialogTests(unittest.TestCase):
         self.assertIsNone(self.dialog.result)
         self.assertTrue(self.dialog.run_button.isEnabled())
         self.assertFalse(self.dialog.open_button.isEnabled())
+        self.assertIsNone(self.dialog.completion_message)
+
+    def test_editor_csv_sets_unambiguous_pixel_convention(self):
+        self.dialog.origin.setCurrentIndex(1)
+        self.dialog.pixel_base.setCurrentIndex(1)
+        self.dialog.use_pixel_csv(str(self.root / "points.csv"))
+        self.assertEqual(self.dialog.origin.currentData(), "top-left")
+        self.assertEqual(self.dialog.pixel_base.currentData(), 0)
+        self.assertEqual(self.dialog.options()["landmarks_csv"], str(self.root / "points.csv"))
 
     def test_serial_mode_registers_whole_stack(self):
         folder = self.root / "serial"
@@ -101,6 +133,7 @@ class EMRegistrationDialogTests(unittest.TestCase):
         self.assertEqual(self.dialog.result["report"]["section_order"], [1, 2, 3])
         self.assertIn("Saved 3 sections", self.dialog.status.text())
         self.assertFalse(self.dialog.preview.pixmap().isNull())
+        self.assertIsNotNone(self.dialog.completion_message)
 
     def test_close_requests_cancellation_and_waits_for_worker(self):
         def wait_for_cancel(**options):

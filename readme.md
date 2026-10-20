@@ -76,12 +76,44 @@ Open **Plug-In → Registration → Serial sections / EM landmarks…** and use:
 | Coordinate origin | **Top-left** |
 | Coordinate indexing | **Zero-based** |
 
-Click **Run registration**, then **Open results folder**. Images are ordered by
+Click **Run registration**. When it finishes, **Registration complete** shows
+the exact `images/` path, with **Open images folder** and **Copy images path**
+buttons. Images are ordered by
 their trailing slice numbers, so `_underwood.10.tif` follows section 9. Section 1
 is the unchanged reference. Section 2 is registered using section 1's landmarks;
 section 3 uses section 2's **registered** landmarks, and so on. Each original
 image is resampled once onto the first section's canvas. All current landmarks,
 including IDs not shared with the preceding section, are propagated onward.
+
+### Create landmarks in the separate pixel window
+
+You do not need to prepare a CSV in another application:
+
+1. Select the images folder (or the two images in pair mode), then click
+   **Create/edit pixel landmarks…**.
+2. Select a landmark ID and click the **same anatomical feature** in both images.
+   Use **New landmark** for another feature. Click again to reposition the
+   current ID. Scroll to zoom; drag to pan.
+3. For a stack, use the slice selectors to continue through the images.
+   Keep the same ID for the same feature. Each adjacent pair needs at least
+   three shared points that do not lie on one line; spread them across the image.
+4. Click **Save CSV and use for registration…**. The main dialog selects this
+   CSV and sets **Top-left / Zero-based** automatically. Choose the output
+   parent folder and click **Run registration**.
+
+The window displays the original TIFF pixels: `(0, 0)` is the top-left pixel,
+X increases rightward, and Y increases downward. Zooming does not change saved
+coordinates. PyReconstruct instead stores trace coordinates in **micrometres
+(µm)** with Y increasing upward; its active alignment can also move those
+coordinates. The separate window avoids mixing these systems.
+
+If you already marked landmarks in an open project, name the small traces
+`lm_1`, `lm_2`, etc., with one trace per ID per image. In the pixel window, use
+**Use project landmarks…** and enter the prefix `lm_`. This converts their
+stored centres using each section's calibration, without applying its alignment
+twice. Select the **exact source TIFFs used by the project**; copied, resized,
+or Zarr sources are not matched automatically. Inspect the converted markers
+before saving. This option does not change your project traces.
 
 ### Inputs and optional pair mode
 

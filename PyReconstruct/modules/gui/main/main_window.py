@@ -3110,7 +3110,11 @@ class MainWindow(QMainWindow):
 
     def runEMRegistration(self):
         from PyReconstruct.modules.gui.dialog.em_registration import EMRegistrationDialog
-        EMRegistrationDialog(self).exec()
+        series = None
+        if self.series and not self.series.isWelcomeSeries():
+            self.saveAllData()
+            series = self.series
+        EMRegistrationDialog(self, series=series).exec()
 
     def runHungarianTracking(self):
         if self.series and self.series.isWelcomeSeries():
