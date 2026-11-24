@@ -3336,6 +3336,7 @@ class MainWindow(QMainWindow):
 
         self.saveAllData()
 
+        from PyReconstruct.modules.gui.dialog.cellpose_review import CellposeReview, LAYER_CHOICES
         from PyReconstruct.modules.backend.view.channel_utils import get_section_channel_count
         channel_count = get_section_channel_count(self.field.section)
         current_channel = int(self.series.getOption("image_channel_single") or 0)
@@ -3353,16 +3354,18 @@ class MainWindow(QMainWindow):
             ["Model", ("combo", ["built-in Cellpose-SAM", "custom Cellpose/SAM model"], "built-in Cellpose-SAM")],
             ["Custom model/checkpoint", ("file", "", "Cellpose model files (*);;PyTorch files (*.pt *.pth);;All files (*)")],
             ["Image channel indexes (up to 3, comma-separated)", ("text", current_channels)],
-            ["Prefix", (True, "text", "cpsam_roi_")],
-            ["Diameter", ("float", 0.0)],
-            ["Minimum ROI area in pixels", ("int", 25)],
+            ["Save ROIs as", (True, "combo", list(LAYER_CHOICES), "DAPI nuclei")],
+            ["Other-layer name prefix", (True, "text", "cpsam_roi_")],
+            ["Diameter in pixels (0 = model default)", (True, "float", 0.0)],
+            ["Minimum ROI area in pixels", (True, "int", 25)],
             ["Use GPU", ("check", ("GPU", False))],
+            ["Next: preview and adjust contours before choosing which sections to apply to."],
         ]
         response, confirmed = QuickDialog.get(self, structure, "Cellpose-SAM Segmentation", spacing=10)
         if not confirmed:
             return
 
-        area, model_choice, custom_model_path, channel_text, prefix, diameter, min_area, gpu_choice = response
+        area, model_choice, custom_model_path, channel_text, role, prefix, diameter, min_area, gpu_choice = response
         area_options = {}
         if area == "Inside selected outline":
             selected = self.field.section.selected_traces
@@ -3389,32 +3392,69 @@ class MainWindow(QMainWindow):
         diameter = None if diameter <= 0 else diameter
 
         try:
-            from pyrecon_connector import run_cellpose_sam_segmentation_on_section
+            from pyrecon_connector import create_cellpose_session
         except Exception as e:
-            notify(f"Cellpose-SAM connector is not installed in this environment.\n\nRun:\npip install -e /path/to/PyReconstruct_connector_tracking_plugin\n\nError:\n{e}")
+            notify(f"Update both PyReconstruct and the connector on cellpose-custom-model, then restart.\n{e}")
             return
 
+        layer = LAYER_CHOICES[role]
+        options = dict(diameter=diameter, min_area=min_area, gpu=use_gpu, channels=channels,
+                       model_source=model_source, model_path=custom_model_path)
+        review = CellposeReview(self, options, layer, prefix if layer == "generic" else None,
+                                area_options.get("boundary_trace"))
+        if review.exec() and review.summary:
+            lines = review.summary.splitlines()
+            if len(lines) <= 10:
+                notify(review.summary)
+            else:
+                from PySide6.QtWidgets import QMessageBox
+                report = QMessageBox(self)
+                report.setWindowTitle("Cellpose-SAM results")
+                report.setText(lines[0])
+                report.setDetailedText("\n".join(lines[1:]))
+                report.exec()
+        review.setParent(None)
+
+    def trainReviewedCellpose(self):
+        from PyReconstruct.modules.gui.dialog.cellpose_review import LAYER_CHOICES, parse_sections, run_task
+        if not self.series or self.series.isWelcomeSeries():
+            notify("Open a real series first.")
+            return
+        structure = [
+            ["Train a separate model using complete, expert-reviewed sections only."],
+            ["ROI layer", (True, "combo", list(LAYER_CHOICES), "DAPI nuclei")],
+            ["Reviewed sections (e.g. 1,6,19)", (True, "text", str(self.series.current_section))],
+            ["Image channel indexes (same order as inference)", (True, "text", str(self.series.getOption("image_channel_single") or 0))],
+            ["Output folder", (True, "dir", "")],
+            ["Training epochs (2–1000)", (True, "int", 100)],
+            ["Use GPU", ("check", ("GPU", False))],
+            ["Approval", ("check", ("I reviewed every cell of this layer on every listed section.", False))],
+            ["Unmarked cells are treated as background. Mapped RNA and tracking links are not training labels."],
+        ]
+        response, ok = QuickDialog.get(self, structure, "Train Cellpose-SAM from reviewed outlines", spacing=10)
+        if not ok:
+            return
+        role, sections, channels, folder, epochs, gpu, approved = response
         try:
-            n = run_cellpose_sam_segmentation_on_section(
-                self.series,
-                self.series.current_section,
-                prefix=prefix,
-                diameter=diameter,
-                min_area=min_area,
-                gpu=use_gpu,
-                channels=channels,
-                model_source=model_source,
-                model_path=custom_model_path,
-                **area_options,
-            )
-        except Exception as e:
-            notify(f"Cellpose-SAM segmentation failed:\n{e}")
+            if not approved[0][1]:
+                raise ValueError("Review the complete sections and check the approval box before training.")
+            numbers = parse_sections(sections)
+            indexes = [int(s.strip()) for s in channels.replace(";", ",").split(",")]
+            if not 1 <= len(indexes) <= 3 or min(indexes) < 0 or len(set(indexes)) != len(indexes):
+                raise ValueError("Enter one to three distinct, nonnegative channel indexes.")
+            from pyrecon_connector import train_reviewed_cellpose
+            self.saveAllData()
+            path = run_task(self, "Preparing reviewed training data", lambda w: train_reviewed_cellpose(
+                self.series, numbers, LAYER_CHOICES[role], indexes, folder, approved=True, epochs=epochs,
+                gpu=gpu[0][1], cancelled=w.isInterruptionRequested, progress=w.status.emit))
+        except InterruptedError as e:
+            notify(str(e))
             return
-
-        self.field.reload()
-        self.field.table_manager.recreateTables()
-        self.seriesModified(True)
-        notify(f"Cellpose-SAM segmentation done. Created {n} ROI traces on section {self.series.current_section}.")
+        except Exception as e:
+            notify(f"Could not train Cellpose-SAM:\n{e}")
+            return
+        notify(f"New model saved:\n{path}\n\nChoose this file as a custom model in Cellpose-SAM. "
+               "Preview it on a section that was not used for training before applying it.")
 
     def importMultiplexROIFolders(self):
         if self.series and self.series.isWelcomeSeries():

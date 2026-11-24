@@ -26,8 +26,8 @@ contract and authoritative plugin list.
 - Serial-section landmark registration with chained TPS/affine transforms,
   propagated landmarks, and complete-stack exports in the first section's frame.
   Optional single-pair mode includes label-preserving mask resampling.
-- Cellpose-SAM segmentation using one or multiple image channels, built-in
-  models, or a local custom checkpoint.
+- Preview Cellpose-SAM outlines, segment selected sections in batches, and
+  fine-tune a separate model from expert-reviewed DAPI or anchor-mRNA outlines.
 - Hungarian and Bayesian DAPI tracking across available sections.
 - Track-aware DAPI selection: click multiple tracked cells and each native
   selection contour gets a distinct display color that follows the same cell ID
@@ -50,9 +50,41 @@ contract and authoritative plugin list.
    **Scribble** and the **Trace** shape.
 2. Select just that outline with the **Pointer**. Open **Plug-In → Segmentation
    → Cellpose-SAM…** and set **Area to segment** to **Inside selected outline**.
-3. Choose the image channel(s) and click **OK**. The plugin adds cell contours
-   on the original section and skips cells touching the outline or image edge
-   in this mode. **Whole section** remains the default.
+3. Choose the image channel(s) and the ROI layer, then click **OK**. Inspect the
+   cyan contours and click **Apply to sections** to save them. This area belongs
+   to the original section only; cells touching its boundary are excluded.
+
+### Preview and batch-segment DAPI or anchor mRNA
+
+1. Open a representative section. Go to **Plug-In → Segmentation → Cellpose-SAM…**.
+   Choose **Whole section**, the channel index(es), and **Save ROIs as → DAPI
+   nuclei** or **Anchor mRNA whole cells**. The layer names the output; it does
+   not choose the stain or image channel for you.
+2. Click **OK** for a read-only preview. Cyan contours are what will be saved.
+   For faint nuclei, try lowering **Cell threshold**, then click **Preview**.
+   Use **Actual pixels / fit** to inspect small outlines. **Close** saves nothing.
+3. In **Apply to sections**, enter e.g. `1-20` for DAPI, or `1,6,19,40` for
+   anchor mRNA. Use consistent channel indexes across those images. Click
+   **Apply to sections**. Missing sections/images/channels and sections already
+   containing the chosen layer are skipped and reported. Unchecking the skip
+   option **appends** ROIs and can create duplicates; it never replaces outlines.
+   Stop keeps completed sections. Use the series-wide undo to undo the batch.
+4. DAPI ROIs go into `multiplex_dapi` for tracking; anchor mRNA goes into
+   `multiplex_rna_anchor` for mapping. Segmentation itself does not link cells.
+
+### Train a separate Cellpose model (optional)
+
+Correct the outlines for **every** cell of one layer on a few complete sections.
+For newly drawn cells, add the objects to that layer's object group. Don't train
+on sections labeled only inside a freehand area: unlabeled cells become background.
+Choose **Plug-In → Segmentation → Train Cellpose-SAM from reviewed outlines…**.
+Select the layer, list only reviewed sections, use the same channels as for
+prediction, select an output folder, and check the expert approval box.
+Training starts from built-in Cellpose-SAM; it does not change the built-in
+model, project ROIs, tracking feedback, or existing custom models. Allow time
+and memory for training; you can stop it. The completion message gives the
+new **weights** file. Choose it under **custom Cellpose/SAM model** and preview
+on a section **not** used for training before adopting it.
 
 ## EM registration
 
