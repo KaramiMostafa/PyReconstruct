@@ -3348,6 +3348,8 @@ class MainWindow(QMainWindow):
         current_channels = ",".join(current_channels.replace(";", ",").split(",")[:3])
         structure = [
             [f"Detected channels: {channel_count} (indexes 0-{channel_count - 1})"],
+            ["Area to segment", (True, "combo", ["Whole section", "Inside selected outline"], "Whole section")],
+            ["For an outline, select one closed trace. Cells touching its edge are skipped."],
             ["Model", ("combo", ["built-in Cellpose-SAM", "custom Cellpose/SAM model"], "built-in Cellpose-SAM")],
             ["Custom model/checkpoint", ("file", "", "Cellpose model files (*);;PyTorch files (*.pt *.pth);;All files (*)")],
             ["Image channel indexes (up to 3, comma-separated)", ("text", current_channels)],
@@ -3360,7 +3362,14 @@ class MainWindow(QMainWindow):
         if not confirmed:
             return
 
-        model_choice, custom_model_path, channel_text, prefix, diameter, min_area, gpu_choice = response
+        area, model_choice, custom_model_path, channel_text, prefix, diameter, min_area, gpu_choice = response
+        area_options = {}
+        if area == "Inside selected outline":
+            selected = self.field.section.selected_traces
+            if len(selected) != 1 or not selected[0].closed:
+                notify("Use the Pointer to select exactly one closed outline on this section, then run Cellpose-SAM again.")
+                return
+            area_options["boundary_trace"] = selected[0]
         try:
             channels = []
             for value in str(channel_text).replace(";", ",").split(","):
@@ -3396,6 +3405,7 @@ class MainWindow(QMainWindow):
                 channels=channels,
                 model_source=model_source,
                 model_path=custom_model_path,
+                **area_options,
             )
         except Exception as e:
             notify(f"Cellpose-SAM segmentation failed:\n{e}")

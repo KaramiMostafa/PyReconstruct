@@ -43,6 +43,17 @@ contract and authoritative plugin list.
 - Antibody-intensity CSVs, overlays, scatter plots, and summary reports.
 - Flexible handling of missing sections and missing image/ROI inputs.
 
+### Segment inside a freehand outline
+
+1. On the current image, use **Closed Trace** to draw around the area of
+   interest. For freehand drawing, right-click **Closed Trace** and choose
+   **Scribble** and the **Trace** shape.
+2. Select just that outline with the **Pointer**. Open **Plug-In → Segmentation
+   → Cellpose-SAM…** and set **Area to segment** to **Inside selected outline**.
+3. Choose the image channel(s) and click **OK**. The plugin adds cell contours
+   on the original section and skips cells touching the outline or image edge
+   in this mode. **Whole section** remains the default.
+
 ## EM registration
 
 This plugin registers EM sections from corresponding landmarks. It supports a
